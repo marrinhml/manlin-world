@@ -6,6 +6,9 @@ const sources = [
   { url: 'https://www.guokr.com/handpick/rss/', name: '果壳网' },
   { url: 'https://www.solidot.org/index.rss', name: 'Solidot' },
   { url: 'https://sspai.com/feed', name: '少数派' },
+  { url: 'https://www.huxiu.com/rss/0.xml', name: '虎嗅网' },
+  { url: 'https://www.ifanr.com/feed', name: '爱范儿' },
+  { url: 'https://www.geekpark.net/rss', name: '极客公园' },
 ]
 
 const sciFiKeywords = [
@@ -35,7 +38,7 @@ exports.handler = async (event, context) => {
   for (const source of sources) {
     try {
       const feed = await parser.parseURL(source.url)
-      const items = feed.items.filter(isSciFiRelated).slice(0, 15).map(item => ({
+      const items = feed.items.filter(isSciFiRelated).slice(0, 25).map(item => ({
         title: item.title || '(无标题)',
         link: item.link || '',
         description: item.contentSnippet ? item.contentSnippet.replace(/\s+/g, ' ').trim().slice(0, 200) : '',
@@ -62,7 +65,7 @@ exports.handler = async (event, context) => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      articles: allItems.slice(0, 20),
+      articles: allItems.slice(0, 50),
       updatedAt: new Date().toISOString(),
       total: allItems.length,
     }),

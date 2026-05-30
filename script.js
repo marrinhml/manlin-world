@@ -767,12 +767,50 @@ async function fetchNews(forceRefresh) {
     const res = await fetch(url)
     if (!res.ok) throw new Error('信号中断')
     const data = await res.json()
-    newsCache = data.articles
+
+    const seenKey = 'manlin_news_seen'
+    let seenLinks = []
     try {
-      localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify({ articles: data.articles, time: Date.now() }))
-    } catch (e) { /* storage full - ignore */ }
-    renderNews(data.articles)
-    document.getElementById('newsUpdateTime').textContent = `最后更新 ${formatDate(data.updatedAt)}`
+      const raw = localStorage.getItem(seenKey)
+      if (raw) seenLinks = JSON.parse(raw)
+    } catch (e) { /* ignore */ }
+
+    let displayArticles
+
+    if (forceRefresh) {
+      const unseen = data.articles.filter(a => {
+        if (!a.link) return true
+        return !seenLinks.includes(a.link)
+      })
+
+      if (unseen.length === 0) {
+        showToast('抱歉探测员，外界频率内容并未更新，请稍等一段时间', 'failure')
+        if (newsCache && newsCache.length > 0) {
+          renderNews(newsCache)
+          document.getElementById('newsUpdateTime').textContent = '最后更新 ' + formatDate(data.updatedAt)
+        } else {
+          displayArticles = data.articles.slice(0, 20)
+        }
+        if (!displayArticles) return
+      } else {
+        displayArticles = unseen.slice(0, 20)
+      }
+    } else {
+      displayArticles = data.articles.slice(0, 20)
+    }
+
+    const newSeen = [...seenLinks, ...displayArticles.map(a => a.link).filter(Boolean)]
+    try {
+      localStorage.setItem(seenKey, JSON.stringify(newSeen.slice(-500)))
+    } catch (e) { /* ignore */ }
+
+    newsCache = displayArticles
+    try {
+      localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify({ articles: displayArticles, time: Date.now() }))
+    } catch (e) { /* ignore */ }
+
+    renderNews(displayArticles)
+    document.getElementById('newsUpdateTime').textContent = '最后更新 ' + formatDate(data.updatedAt)
   } catch (e) {
     console.error('fetchNews error:', e)
     let fallback = null
