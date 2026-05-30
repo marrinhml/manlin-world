@@ -1460,6 +1460,7 @@ function handleSplashEnter() {
 function init() {
   ideas = getIdeas()
   loadTheme()
+  initNetStatus()
   const savedSession = getSession()
   if (savedSession) {
     const users = getUsers()
@@ -1617,6 +1618,29 @@ function init() {
         if (overlay.id === 'cropModal') { /* no state to reset */ }
       }
     })
+  })
+}
+
+function initNetStatus() {
+  const el = document.getElementById('netStatus')
+  if (!el) return
+
+  function update(status) {
+    el.className = 'net-status ' + status
+    el.textContent = status === 'online' ? '●' : '○'
+    el.title = status === 'online' ? '网络连接正常' : '网络已断开'
+  }
+
+  update(navigator.onLine ? 'online' : 'offline')
+
+  window.addEventListener('online', () => {
+    update('online')
+    showToast('网络已恢复连接', 'success')
+  })
+
+  window.addEventListener('offline', () => {
+    update('offline')
+    showToast('网络连接已断开，部分功能可能不可用', 'failure')
   })
 }
 

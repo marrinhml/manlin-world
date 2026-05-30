@@ -3019,3 +3019,21 @@ body.reveal .content-section {
 .comment-sub-btn.like-anim .sub-icon {
   animation: likePop 0.4s ease;
 }
+
+.net-status {
+  font-size: 10px;
+  line-height: 1;
+  cursor: default;
+  transition: color 0.3s ease;
+  margin-right: 4px;
+}
+
+.net-status.online {
+  color: #34d399;
+  text-shadow: 0 0 6px rgba(52, 211, 153, 0.4);
+}
+
+.net-status.offline {
+  color: #ef4444;
+  text-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+}
