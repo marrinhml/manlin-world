@@ -9,6 +9,7 @@ const sources = [
   { url: 'https://www.huxiu.com/rss/0.xml', name: '虎嗅网' },
   { url: 'https://www.ifanr.com/feed', name: '爱范儿' },
   { url: 'https://www.geekpark.net/rss', name: '极客公园' },
+  { url: 'https://rsshub.app/bilibili/popular/weekly', name: 'B站每周必看' },
 ]
 
 const sciFiKeywords = [
@@ -30,7 +31,7 @@ function isSciFiRelated(item) {
 exports.handler = async (event, context) => {
   const parser = new Parser({
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ManlinWorld/1.0)', 'Accept': 'application/rss+xml, application/xml, text/xml, */*' },
-    timeout: 10000,
+    timeout: 15000,
   })
 
   const allItems = []
