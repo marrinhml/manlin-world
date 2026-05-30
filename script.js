@@ -533,7 +533,7 @@ async function fetchNews() {
     </div>`
 
   try {
-    const res = await fetch('/api/news')
+    const res = await fetch('/.netlify/functions/news')
     if (!res.ok) throw new Error('信号中断')
     const data = await res.json()
     newsCache = data.articles
