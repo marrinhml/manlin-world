@@ -748,7 +748,7 @@ function setSort(sort) {
   renderIdeas()
 }
 
-async function fetchNews() {
+async function fetchNews(forceRefresh) {
   const grid = document.getElementById('newsGrid')
   const countEl = document.getElementById('newsCount')
   countEl.textContent = '接收中…'
@@ -760,7 +760,11 @@ async function fetchNews() {
     </div>`
 
   try {
-    const res = await fetch('/.netlify/functions/news')
+    let url = '/.netlify/functions/news'
+    if (forceRefresh) {
+      url += '?_=' + Date.now()
+    }
+    const res = await fetch(url)
     if (!res.ok) throw new Error('信号中断')
     const data = await res.json()
     newsCache = data.articles
@@ -1436,7 +1440,7 @@ function init() {
 
   document.getElementById('btnRefreshNews').addEventListener('click', () => {
     newsCache = null
-    fetchNews()
+    fetchNews(true)
   })
 
   try {
