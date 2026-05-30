@@ -3021,11 +3021,12 @@ body.reveal .content-section {
 }
 
 .net-status {
-  font-size: 10px;
+  font-size: 14px;
   line-height: 1;
   cursor: default;
   transition: color 0.3s ease;
-  margin-right: 4px;
+  margin: 0 6px;
+  vertical-align: middle;
 }
 
 .net-status.online {
