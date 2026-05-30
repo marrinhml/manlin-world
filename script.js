@@ -100,6 +100,18 @@ function migrateIdea(idea) {
   if (!idea.comments) idea.comments = []
   if (!idea.authorNickname) idea.authorNickname = ''
   if (!idea.tags) idea.tags = []
+  if (idea.views === undefined) idea.views = 0
+  if (idea.comments) {
+    idea.comments.forEach(c => {
+      if (c.likes === undefined) c.likes = 0
+      if (!c.likedBy) c.likedBy = []
+      if (!c.replies) c.replies = []
+      c.replies.forEach(r => {
+        if (r.likes === undefined) r.likes = 0
+        if (!r.likedBy) r.likedBy = []
+      })
+    })
+  }
   return idea
 }
 
@@ -281,12 +293,48 @@ function renderIdeas() {
           const cNickname = getUserNickname(c.author) || '匿名'
           const cAvatar = getUserAvatar(c.author)
           const cAvatarHtml = cAvatar ? `<img class="comment-avatar-img" src="${cAvatar}" alt="">` : '<div class="comment-avatar">✦</div>'
+          const cIsLiked = isLoggedIn && c.likedBy && c.likedBy.includes(user)
+          const repliesHtml = c.replies && c.replies.length > 0
+            ? c.replies.map(r => {
+                const rText = r.text.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                const rNickname = getUserNickname(r.author) || '匿名'
+                const rAvatar = getUserAvatar(r.author)
+                const rAvatarHtml = rAvatar ? `<img class="comment-avatar-img" src="${rAvatar}" alt="">` : '<div class="comment-avatar">✦</div>'
+                const rIsLiked = isLoggedIn && r.likedBy && r.likedBy.includes(user)
+                return `
+                <div class="reply-item">
+                  ${rAvatarHtml}
+                  <div class="comment-body">
+                    <div class="comment-author">${rNickname}</div>
+                    <div class="comment-text">${rText}</div>
+                    <div class="comment-sub-actions">
+                      <button class="comment-sub-btn ${rIsLiked ? 'liked' : ''}" data-action="replyLike" data-idea-id="${item.id}" data-comment-id="${c.id}" data-reply-id="${r.id}">
+                        <span class="sub-icon">${rIsLiked ? '♥' : '♡'}</span>
+                        <span class="sub-count">${r.likes || 0}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>`
+              }).join('')
+            : ''
           return `
-            <div class="comment-item">
+            <div class="comment-item" data-comment-id="${c.id}">
               ${cAvatarHtml}
               <div class="comment-body">
                 <div class="comment-author">${cNickname}</div>
                 <div class="comment-text">${cText}</div>
+                <div class="comment-sub-actions">
+                  <button class="comment-sub-btn ${cIsLiked ? 'liked' : ''}" data-action="commentLike" data-idea-id="${item.id}" data-comment-id="${c.id}">
+                    <span class="sub-icon">${cIsLiked ? '♥' : '♡'}</span>
+                    <span class="sub-count">${c.likes || 0}</span>
+                  </button>
+                  ${isLoggedIn ? `<button class="comment-sub-btn" data-action="toggleReply" data-idea-id="${item.id}" data-comment-id="${c.id}">↩ 回复</button>` : ''}
+                </div>
+                ${repliesHtml}
+                <div class="reply-form" id="replyForm-${item.id}-${c.id}" style="display:none">
+                  <input type="text" class="reply-input" id="replyInput-${item.id}-${c.id}" placeholder="写下回复…" maxlength="200">
+                  <button class="reply-submit" data-action="submitReply" data-idea-id="${item.id}" data-comment-id="${c.id}">发送</button>
+                </div>
               </div>
             </div>`
         }).join('')
@@ -312,6 +360,10 @@ function renderIdeas() {
             <span class="action-icon">◷</span>
             <span class="action-count">${commentCount}</span>
           </button>
+          <span class="card-action-stat">
+            <span class="action-icon">◎</span>
+            <span class="card-view-count">${item.views || 0}</span>
+          </span>
           <span class="card-actions-divider"></span>
           <button class="card-action-btn action-edit" data-action="edit" data-id="${item.id}">
             <span class="action-icon">✎</span>
@@ -396,6 +448,46 @@ function attachCardEvents() {
       if (author) viewUserInfo(author)
     })
   })
+
+  document.querySelectorAll('[data-action="commentLike"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      handleCommentLike(btn.dataset.ideaId, btn.dataset.commentId)
+    })
+  })
+
+  document.querySelectorAll('[data-action="replyLike"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      handleReplyLike(btn.dataset.ideaId, btn.dataset.commentId, btn.dataset.replyId)
+    })
+  })
+
+  document.querySelectorAll('[data-action="toggleReply"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      handleToggleReply(btn.dataset.ideaId, btn.dataset.commentId)
+    })
+  })
+
+  document.querySelectorAll('[data-action="submitReply"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      handleSubmitReply(btn.dataset.ideaId, btn.dataset.commentId)
+    })
+  })
+
+  document.querySelectorAll('.reply-input').forEach(input => {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        const parts = input.id.replace('replyInput-', '').split('-')
+        if (parts.length === 2) {
+          handleSubmitReply(parts[0], parts[1])
+        }
+      }
+    })
+  })
 }
 
 function handleLike(id) {
@@ -411,6 +503,8 @@ function handleLike(id) {
   if (idea.likes === undefined) idea.likes = 0
 
   const idx = idea.likedBy.indexOf(currentUser)
+  const wasNotLiked = idx === -1
+
   if (idx > -1) {
     idea.likedBy.splice(idx, 1)
     idea.likes = Math.max(0, idea.likes - 1)
@@ -421,12 +515,30 @@ function handleLike(id) {
 
   saveIdeas(ideas)
   renderIdeas()
+
+  if (wasNotLiked) {
+    const btn = document.querySelector(`[data-action="like"][data-id="${id}"]`)
+    if (btn) {
+      btn.classList.add('like-anim')
+      setTimeout(() => btn.classList.remove('like-anim'), 500)
+    }
+  }
 }
 
 function toggleComments(id) {
   const el = document.getElementById(`comments-${id}`)
   if (!el) return
+  const wasClosed = !el.classList.contains('open')
   el.classList.toggle('open')
+  if (wasClosed) {
+    const idea = ideas.find(item => item.id === id)
+    if (idea) {
+      idea.views = (idea.views || 0) + 1
+      const viewEl = document.querySelector(`[data-id="${id}"] .card-view-count`)
+      if (viewEl) viewEl.textContent = idea.views
+      saveIdeas(ideas)
+    }
+  }
 }
 
 function handleEdit(id) {
@@ -471,7 +583,10 @@ function handleSubmitComment(id) {
     id: generateId(),
     text,
     author: currentUser,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    likes: 0,
+    likedBy: [],
+    replies: []
   })
 
   saveIdeas(ideas)
@@ -482,6 +597,118 @@ function handleSubmitComment(id) {
     el.classList.add('open')
   }
 
+  renderIdeas()
+}
+
+function handleCommentLike(ideaId, commentId) {
+  if (!currentUser) {
+    showToast('请先登录后点赞', 'failure')
+    return
+  }
+  const idea = ideas.find(item => item.id === ideaId)
+  if (!idea || !idea.comments) return
+  const comment = idea.comments.find(c => c.id === commentId)
+  if (!comment) return
+  if (!comment.likedBy) comment.likedBy = []
+  if (comment.likes === undefined) comment.likes = 0
+  const wasNotLiked = !comment.likedBy.includes(currentUser)
+  const idx = comment.likedBy.indexOf(currentUser)
+  if (idx > -1) {
+    comment.likedBy.splice(idx, 1)
+    comment.likes = Math.max(0, comment.likes - 1)
+  } else {
+    comment.likedBy.push(currentUser)
+    comment.likes = (comment.likes || 0) + 1
+  }
+  saveIdeas(ideas)
+  renderIdeas()
+  if (wasNotLiked) {
+    const btn = document.querySelector(`[data-action="commentLike"][data-idea-id="${ideaId}"][data-comment-id="${commentId}"]`)
+    if (btn) {
+      btn.classList.add('like-anim')
+      setTimeout(() => btn.classList.remove('like-anim'), 500)
+    }
+  }
+}
+
+function handleReplyLike(ideaId, commentId, replyId) {
+  if (!currentUser) {
+    showToast('请先登录后点赞', 'failure')
+    return
+  }
+  const idea = ideas.find(item => item.id === ideaId)
+  if (!idea || !idea.comments) return
+  const comment = idea.comments.find(c => c.id === commentId)
+  if (!comment || !comment.replies) return
+  const reply = comment.replies.find(r => r.id === replyId)
+  if (!reply) return
+  if (!reply.likedBy) reply.likedBy = []
+  if (reply.likes === undefined) reply.likes = 0
+  const wasNotLiked = !reply.likedBy.includes(currentUser)
+  const idx = reply.likedBy.indexOf(currentUser)
+  if (idx > -1) {
+    reply.likedBy.splice(idx, 1)
+    reply.likes = Math.max(0, reply.likes - 1)
+  } else {
+    reply.likedBy.push(currentUser)
+    reply.likes = (reply.likes || 0) + 1
+  }
+  saveIdeas(ideas)
+  renderIdeas()
+  if (wasNotLiked) {
+    const btn = document.querySelector(`[data-action="replyLike"][data-idea-id="${ideaId}"][data-comment-id="${commentId}"][data-reply-id="${replyId}"]`)
+    if (btn) {
+      btn.classList.add('like-anim')
+      setTimeout(() => btn.classList.remove('like-anim'), 500)
+    }
+  }
+}
+
+function handleToggleReply(ideaId, commentId) {
+  if (!currentUser) {
+    showToast('请先登录后回复', 'failure')
+    return
+  }
+  const form = document.getElementById(`replyForm-${ideaId}-${commentId}`)
+  if (!form) return
+  form.style.display = form.style.display === 'none' ? 'flex' : 'none'
+  if (form.style.display === 'flex') {
+    const input = document.getElementById(`replyInput-${ideaId}-${commentId}`)
+    if (input) input.focus()
+  }
+}
+
+function handleSubmitReply(ideaId, commentId) {
+  if (!currentUser) {
+    showToast('请先登录后回复', 'failure')
+    return
+  }
+  const input = document.getElementById(`replyInput-${ideaId}-${commentId}`)
+  if (!input) return
+  const text = input.value.trim()
+  if (!text) return
+  const idea = ideas.find(item => item.id === ideaId)
+  if (!idea) return
+  if (!idea.comments) idea.comments = []
+  const comment = idea.comments.find(c => c.id === commentId)
+  if (!comment) return
+  if (!comment.replies) comment.replies = []
+  comment.replies.push({
+    id: generateId(),
+    text,
+    author: currentUser,
+    createdAt: new Date().toISOString(),
+    likes: 0,
+    likedBy: []
+  })
+  saveIdeas(ideas)
+  input.value = ''
+  const form = document.getElementById(`replyForm-${ideaId}-${commentId}`)
+  if (form) form.style.display = 'none'
+  const el = document.getElementById(`comments-${ideaId}`)
+  if (el && !el.classList.contains('open')) {
+    el.classList.add('open')
+  }
   renderIdeas()
 }
 
