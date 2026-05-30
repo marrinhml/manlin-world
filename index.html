@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>蛮林世界 — 科幻创意自留地</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
+</head>
+<body>
+
+  <div id="splashScreen" class="splash-screen">
+    <div class="splash-grid"></div>
+    <div class="splash-scanline"></div>
+    <div class="splash-hologram"></div>
+    <div class="splash-content">
+      <div class="splash-badge">✦ 探测终端 v1.0</div>
+      <div class="splash-ring"></div>
+      <h1 class="splash-title">
+        <span class="title-line">您好探测员，</span>
+        <span class="title-line title-gold">欢迎来到蛮林世界</span>
+      </h1>
+      <p class="splash-sub">MANLIN WORLD · 科幻创意自留地</p>
+      <button class="splash-btn" id="btnEnter">
+        <span class="splash-btn-border"></span>
+        <span class="splash-btn-text">开始探测任务</span>
+        <span class="splash-btn-arrow">⟶</span>
+      </button>
+      <div class="splash-footer-text">
+        <span class="splash-blink">●</span> 系统就绪 · 等待指令
+      </div>
+    </div>
+
+    <div class="splash-loading" id="splashLoading">
+      <div class="loading-progress">
+        <svg class="loading-ring" viewBox="0 0 120 120">
+          <circle class="ring-bg" cx="60" cy="60" r="52" />
+          <circle class="ring-fill" id="ringFill" cx="60" cy="60" r="52" />
+        </svg>
+        <span class="loading-percent" id="loadingPercent">0%</span>
+      </div>
+      <p class="loading-text">探测系统加载中<span class="loading-dot">.</span><span class="loading-dot">.</span><span class="loading-dot">.</span></p>
+    </div>
+  </div>
+
+  <div id="stars"></div>
+
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">✦</span>
+        <span class="logo-text">蛮林世界</span>
+        <button class="btn btn-about" id="btnAbout">关于</button>
+        <span class="logo-sub">MANLIN WORLD</span>
+      </div>
+      <div class="header-controls">
+        <div class="user-area" id="userArea">
+          <div class="user-guest" id="userGuest">
+            <button class="btn" id="btnLogin">登录</button>
+            <button class="btn btn-primary" id="btnRegister">注册</button>
+          </div>
+          <div class="user-logged" id="userLogged" style="display:none">
+            <button class="user-profile-btn" id="btnProfile">
+              <span class="user-avatar" id="userAvatar">✦</span>
+              <span class="user-name" id="userNameDisplay">探测员</span>
+            </button>
+            <button class="btn btn-logout" id="btnLogout">退出</button>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="btnNewIdea" aria-label="发布新内容">
+          <span class="btn-icon">+</span>
+          发布新内容
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main" id="mainContent">
+    <div class="container">
+
+      <section class="publish-section" id="publishSection">
+        <div class="publish-card">
+          <div class="publish-header">
+            <h2 class="publish-title">记录一段科幻灵感</h2>
+            <button class="btn-close" id="btnCloseForm" aria-label="关闭">✕</button>
+          </div>
+          <form id="publishForm" autocomplete="off">
+            <div class="form-group">
+              <input type="text" id="ideaTitle" class="form-input" placeholder="给你的灵感取个名字…" maxlength="100" required>
+            </div>
+            <div class="form-group">
+              <textarea id="ideaContent" class="form-textarea" placeholder="写下你的科幻想法… 支持 Markdown 格式&#10;图片: 点击下方 📷 按钮上传" rows="6" required></textarea>
+            </div>
+            <div class="form-row form-tools">
+              <div class="form-tools-left">
+                <div class="form-tags-group">
+                  <input type="text" id="ideaTags" class="form-input tag-input" placeholder="标签（用逗号分隔）" maxlength="100">
+                </div>
+              </div>
+              <div class="form-tools-right">
+                <input type="file" id="imageUpload" accept="image/*" style="display:none">
+                <button type="button" class="btn btn-upload-img" id="btnUploadImage" title="上传图片">
+                  <span class="btn-icon">📷</span> 图片
+                </button>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="category-selector">
+                <button type="button" class="cat-option active" data-value="idea">
+                  <span class="cat-dot idea-dot"></span>
+                  科幻点子
+                </button>
+                <button type="button" class="cat-option" data-value="concept">
+                  <span class="cat-dot concept-dot"></span>
+                  科幻概念
+                </button>
+                <button type="button" class="cat-option" data-value="essay">
+                  <span class="cat-dot essay-dot"></span>
+                  科幻随笔
+                </button>
+              </div>
+              <button type="submit" class="btn btn-glow" id="btnPublish">
+                ✦ 发布
+              </button>
+            </div>
+          </form>
+        </div>
+      <div class="tag-filter-bar" id="tagFilterBar" style="display:none">
+          <span class="tag-filter-label">标签</span>
+          <div class="tag-filter-list" id="tagFilterList"></div>
+          <button class="tag-filter-clear" id="tagFilterClear">✕ 清除</button>
+        </div>
+      </section>
+
+      <section class="filter-section">
+        <div class="filter-bar">
+          <button class="filter-btn active" data-filter="all">全部内容</button>
+          <button class="filter-btn" data-filter="idea">
+            <span class="filter-dot idea-dot"></span>
+            科幻点子
+          </button>
+          <button class="filter-btn" data-filter="concept">
+            <span class="filter-dot concept-dot"></span>
+            科幻概念
+          </button>
+          <button class="filter-btn" data-filter="essay">
+            <span class="filter-dot essay-dot"></span>
+            科幻随笔
+          </button>
+          <span class="filter-separator"></span>
+          <button class="filter-btn filter-news-btn" data-filter="news">
+            <span class="filter-dot news-dot"></span>
+            星际资讯
+          </button>
+        </div>
+        <div class="search-sort-row" id="searchSortRow">
+          <div class="search-box">
+            <span class="search-icon">⌕</span>
+            <input type="text" id="searchInput" class="search-input" placeholder="搜索内容…">
+          </div>
+          <div class="sort-controls">
+            <button class="sort-btn active" data-sort="time">时间</button>
+            <button class="sort-btn" data-sort="hotness">热度</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section" id="contentSection">
+        <div class="section-header">
+          <span class="section-title" id="sectionTitle">全部内容</span>
+          <span class="section-count" id="sectionCount">0 条记录</span>
+        </div>
+        <div class="cards-grid" id="cardsGrid">
+          <div class="empty-state" id="emptyState">
+            <div class="empty-icon">⟡</div>
+            <p class="empty-text">世界尚无一物</p>
+            <p class="empty-hint">点击「发布新内容」写下你的第一个科幻灵感</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="news-section" id="newsSection" style="display:none">
+        <div class="section-header">
+          <span class="section-title" id="newsSectionTitle">⟡ 星际资讯</span>
+          <span class="section-count" id="newsCount">接收中…</span>
+        </div>
+        <div class="news-grid" id="newsGrid">
+          <div class="empty-state">
+            <div class="empty-icon">⟡</div>
+            <p class="empty-text">正在接收星际信号…</p>
+            <p class="empty-hint">请稍候，正在从各星系节点获取最新资讯</p>
+          </div>
+        </div>
+        <div class="news-footer">
+          <button class="btn btn-refresh" id="btnRefreshNews">⟳ 刷新信号</button>
+          <span class="news-update-time" id="newsUpdateTime"></span>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p>蛮林世界 · 科幻创意自留地</p>
+  </footer>
+
+  <div class="modal-overlay" id="registerModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">
+          <span class="modal-icon">⟐</span>
+          注册账号
+        </h2>
+        <button class="modal-close" id="btnCloseRegister">✕</button>
+      </div>
+      <form id="registerForm" autocomplete="off">
+        <div class="form-group">
+          <label class="form-label">邮箱地址 / 手机号码</label>
+          <input type="text" id="regAccount" class="form-input modal-input" placeholder="输入邮箱或手机号" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">探测员昵称</label>
+          <div class="nickname-row">
+            <input type="text" id="regNickname" class="form-input modal-input nickname-input" placeholder="给自己取个代号" maxlength="20" required>
+            <button type="button" class="btn btn-random" id="btnRandomNickname">⟳ 随机</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">设置密码</label>
+          <input type="password" id="regPassword" class="form-input modal-input" placeholder="至少 6 位密码" minlength="6" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">确认密码</label>
+          <input type="password" id="regConfirm" class="form-input modal-input" placeholder="再次输入密码" minlength="6" required>
+        </div>
+        <button type="submit" class="modal-submit btn-glow" style="width:100%;justify-content:center">
+          ✦ 注册
+        </button>
+        <p class="modal-switch">
+          已有账号？<a href="#" id="switchToLogin">去登录</a>
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="loginModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">
+          <span class="modal-icon">⟐</span>
+          登录账号
+        </h2>
+        <button class="modal-close" id="btnCloseLogin">✕</button>
+      </div>
+      <form id="loginForm" autocomplete="off">
+        <div class="form-group">
+          <label class="form-label">邮箱地址 / 手机号码</label>
+          <input type="text" id="loginAccount" class="form-input modal-input" placeholder="输入注册时的邮箱或手机号" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">密码</label>
+          <input type="password" id="loginPassword" class="form-input modal-input" placeholder="输入密码" required>
+        </div>
+        <button type="submit" class="modal-submit btn-glow" style="width:100%;justify-content:center">
+          ✦ 登录
+        </button>
+        <p class="modal-switch">
+          还没有账号？<a href="#" id="switchToRegister">去注册</a>
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <div class="modal-overlay" id="editModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">
+          <span class="modal-icon">⟐</span>
+          编辑内容
+        </h2>
+        <button class="modal-close" id="btnCloseEdit">✕</button>
+      </div>
+      <form id="editForm" autocomplete="off">
+        <div class="form-group">
+          <label class="form-label">标题</label>
+          <input type="text" id="editTitle" class="form-input modal-input" maxlength="100" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">正文</label>
+          <textarea id="editContent" class="form-textarea modal-input" rows="6" required></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">标签（用逗号分隔）</label>
+          <input type="text" id="editTags" class="form-input modal-input" placeholder="标签1, 标签2" maxlength="100">
+        </div>
+        <div class="form-group">
+          <label class="form-label">分类</label>
+          <div class="category-selector" id="editCategorySelector">
+            <button type="button" class="cat-option" data-value="idea">
+              <span class="cat-dot idea-dot"></span>
+              科幻点子
+            </button>
+            <button type="button" class="cat-option" data-value="concept">
+              <span class="cat-dot concept-dot"></span>
+              科幻概念
+            </button>
+            <button type="button" class="cat-option" data-value="essay">
+              <span class="cat-dot essay-dot"></span>
+              科幻随笔
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="modal-submit btn-glow" style="width:100%;justify-content:center">
+          ✦ 保存修改
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-card confirm-card">
+      <div class="confirm-icon">◉</div>
+      <p class="confirm-text" id="confirmText">确认删除这条内容？</p>
+      <div class="confirm-actions">
+        <button class="btn confirm-cancel" id="confirmCancel">取消</button>
+        <button class="btn confirm-delete" id="confirmDelete">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="aboutModal">
+    <div class="modal-card about-card">
+      <div class="modal-header">
+        <h2 class="modal-title">
+          <span class="modal-icon">✦</span>
+          关于蛮林世界
+        </h2>
+        <button class="modal-close" id="btnCloseAbout">✕</button>
+      </div>
+      <div class="about-body">
+        <div class="about-hero">
+          <div class="about-logo">✦ 蛮林世界</div>
+          <p class="about-tagline">科幻创意自留地 · 记录 | 存放 | 展示 | 讨论</p>
+        </div>
+        <div class="about-section">
+          <h3 class="about-section-title">⟐ 关于本站</h3>
+          <p class="about-text">蛮林世界是一个专注于科幻创意记录与分享的轻社区。无论是一个转瞬即逝的脑洞、一个体系完整的硬核设定，还是一篇有感而发的随笔，这里都是它们栖息的场所。</p>
+        </div>
+        <div class="about-section">
+          <h3 class="about-section-title">⟐ 内容分类</h3>
+          <div class="about-types">
+            <div class="about-type">
+              <span class="about-type-dot idea-dot"></span>
+              <div>
+                <div class="about-type-name">科幻点子</div>
+                <div class="about-type-desc">短、碎、灵感式内容，一个脑洞、一个设定雏形</div>
+              </div>
+            </div>
+            <div class="about-type">
+              <span class="about-type-dot concept-dot"></span>
+              <div>
+                <div class="about-type-name">科幻概念</div>
+                <div class="about-type-desc">完整、体系化、偏理性的科幻设定与解析</div>
+              </div>
+            </div>
+            <div class="about-type">
+              <span class="about-type-dot essay-dot"></span>
+              <div>
+                <div class="about-type-name">科幻随笔</div>
+                <div class="about-type-desc">文艺、感想、赏析类的科幻相关感悟</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="about-section">
+          <h3 class="about-section-title">⟐ 平台功能</h3>
+          <ul class="about-features">
+            <li>发布三种类型科幻内容（点子 / 概念 / 随笔）</li>
+            <li>分类筛选与全文搜索</li>
+            <li>时间 / 热度双模式排序</li>
+            <li>内容编辑、删除管理</li>
+            <li>点赞互动与评论区讨论</li>
+            <li>注册登录，个人主页</li>
+            <li>本地存储，数据持久化</li>
+          </ul>
+        </div>
+        <div class="about-section about-footer-section">
+          <p class="about-version">终端 v1.0 · 蛮林世界 MANLIN WORLD</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="profileModal">
+    <div class="modal-card profile-card">
+      <div class="modal-header">
+        <h2 class="modal-title">
+          <span class="modal-icon">⟐</span>
+          探测员档案
+        </h2>
+        <button class="modal-close" id="btnCloseProfile">✕</button>
+      </div>
+      <div class="profile-body" id="profileBody">
+        <div class="profile-header">
+          <div class="profile-avatar-large">✦</div>
+          <div class="profile-info">
+            <div class="profile-account" id="profileAccount">-</div>
+            <div class="profile-joindate" id="profileJoinDate">-</div>
+          </div>
+        </div>
+        <div class="profile-stats">
+          <div class="profile-stat">
+            <span class="profile-stat-value" id="profileStatPosts">0</span>
+            <span class="profile-stat-label">发布</span>
+          </div>
+          <div class="profile-stat">
+            <span class="profile-stat-value" id="profileStatLikes">0</span>
+            <span class="profile-stat-label">获赞</span>
+          </div>
+          <div class="profile-stat">
+            <span class="profile-stat-value" id="profileStatComments">0</span>
+            <span class="profile-stat-label">评论</span>
+          </div>
+        </div>
+        <div class="profile-posts-section">
+          <div class="profile-posts-header">
+            <span class="profile-posts-title">我的发布</span>
+            <span class="profile-posts-count" id="profilePostsCount">0 条</span>
+          </div>
+          <div class="profile-posts-list" id="profilePostsList">
+            <div class="profile-posts-empty">暂无发布</div>
+          </div>
+        </div>
+        <div class="profile-actions">
+          <button class="btn profile-action-btn settings-btn" id="btnOpenSettings">修改信息</button>
+          <button class="btn profile-action-btn delete-account-btn" id="btnDeleteAccount">注销账号</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="userInfoModal">
+    <div class="modal-card userinfo-card">
+      <div class="modal-header">
+        <h2 class="modal-title">
+          <span class="modal-icon">✦</span>
+          探测员资料
+        </h2>
+        <button class="modal-close" id="btnCloseUserInfo">✕</button>
+      </div>
+      <div class="profile-body">
+        <div class="profile-header">
+          <div class="profile-avatar-large">✦</div>
+          <div class="profile-info">
+            <div class="profile-account" id="userInfoNickname">-</div>
+            <div class="profile-joindate" id="userInfoAccount">-</div>
+            <div class="profile-joindate" id="userInfoJoinDate">-</div>
+          </div>
+        </div>
+        <div class="profile-stats">
+          <div class="profile-stat">
+            <span class="profile-stat-value" id="userInfoStatPosts">0</span>
+            <span class="profile-stat-label">发布</span>
+          </div>
+          <div class="profile-stat">
+            <span class="profile-stat-value" id="userInfoStatLikes">0</span>
+            <span class="profile-stat-label">获赞</span>
+          </div>
+          <div class="profile-stat">
+            <span class="profile-stat-value" id="userInfoStatComments">0</span>
+            <span class="profile-stat-label">评论</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-card settings-card">
+      <div class="modal-header">
+        <h2 class="modal-title">
+          <span class="modal-icon">⟐</span>
+          修改信息
+        </h2>
+        <button class="modal-close" id="btnCloseSettings">✕</button>
+      </div>
+      <form id="settingsForm" autocomplete="off">
+        <div class="settings-avatar-section">
+          <label class="form-label">探测员头像</label>
+          <div class="settings-avatar-row">
+            <img class="settings-avatar-preview" id="settingsAvatarPreview" src="" alt="头像">
+            <div class="settings-avatar-actions">
+              <input type="file" id="avatarUpload" accept="image/*" style="display:none">
+              <button type="button" class="btn btn-random" id="btnUploadAvatar">📷 上传</button>
+              <button type="button" class="btn btn-random" id="btnRandomAvatar">⟳ 随机头像</button>
+            </div>
+          </div>
+        </div>
+        <div class="settings-divider"></div>
+        <div class="form-group">
+          <label class="form-label">探测员昵称</label>
+          <div class="nickname-row">
+            <input type="text" id="settingsNickname" class="form-input modal-input nickname-input" maxlength="20" required>
+            <button type="button" class="btn btn-random" id="btnRandomNicknameSettings">⟳ 随机</button>
+          </div>
+        </div>
+        <div class="settings-divider"></div>
+        <div class="form-group">
+          <label class="form-label">当前密码</label>
+          <input type="password" id="settingsCurrPwd" class="form-input modal-input" placeholder="输入当前密码">
+        </div>
+        <div class="form-group">
+          <label class="form-label">新密码</label>
+          <input type="password" id="settingsNewPwd" class="form-input modal-input" placeholder="留空则不修改" minlength="6">
+        </div>
+        <div class="form-group">
+          <label class="form-label">确认新密码</label>
+          <input type="password" id="settingsConfirmPwd" class="form-input modal-input" placeholder="再次输入新密码" minlength="6">
+        </div>
+        <button type="submit" class="modal-submit btn-glow" style="width:100%;justify-content:center">
+          ✦ 保存设置
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="cropModal">
+    <div class="modal-card crop-card">
+      <div class="modal-header">
+        <h2 class="modal-title">
+          <span class="modal-icon">⟐</span>
+          编辑头像
+        </h2>
+        <button class="modal-close" id="btnCloseCrop">✕</button>
+      </div>
+      <div class="crop-body">
+        <div class="crop-viewport" id="cropViewport">
+          <div class="crop-image-wrap" id="cropImageWrap">
+            <img id="cropImage" src="" alt="裁剪头像" draggable="false">
+          </div>
+          <div class="crop-frame"></div>
+        </div>
+        <div class="crop-controls">
+          <label class="crop-zoom-label">
+            <span>缩放</span>
+            <input type="range" class="crop-zoom-slider" id="cropZoom" min="50" max="200" value="100">
+            <span id="cropZoomValue">100%</span>
+          </label>
+        </div>
+        <div class="crop-actions">
+          <button class="btn confirm-cancel" id="btnCancelCrop">取消</button>
+          <button class="btn btn-glow crop-confirm-btn" id="btnConfirmCrop">✦ 确认</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="theme-float" id="btnTheme" aria-label="切换主题">◐</button>
+
+  <script src="script.js"></script>
+</body>
+</html>
