@@ -31,14 +31,11 @@ function isSciFiRelated(item) {
 exports.handler = async (event, context) => {
   const parser = new Parser({
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ManlinWorld/1.0)', 'Accept': 'application/rss+xml, application/xml, text/xml, */*' },
-    timeout: 15000,
+    timeout: 8000,
   })
 
-  const allItems = []
-
-  for (const source of sources) {
-    try {
-      const feed = await parser.parseURL(source.url)
+  const results = await Promise.allSettled(sources.map(source =>
+    parser.parseURL(source.url).then(feed => {
       const items = feed.items.filter(isSciFiRelated).slice(0, 25).map(item => ({
         title: item.title || '(无标题)',
         link: item.link || '',
@@ -46,11 +43,14 @@ exports.handler = async (event, context) => {
         pubDate: item.pubDate || item.isoDate || '',
         source: source.name,
       }))
-      allItems.push(...items)
-    } catch (e) {
+      return items
+    }).catch(e => {
       console.error(`[news] fetch ${source.name} failed:`, e.message)
-    }
-  }
+      return []
+    })
+  ))
+
+  const allItems = results.flatMap(r => r.value || [])
 
   allItems.sort((a, b) => {
     const da = a.pubDate ? new Date(a.pubDate).getTime() : 0
