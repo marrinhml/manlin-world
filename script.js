@@ -37,6 +37,7 @@ let deletingId = null
 let ideas = []
 let currentUser = null
 let currentUserProfile = null
+let isSupabaseOnline = true
 let newsCache = null
 let newsFilter = 'all'
 let currentPage = 1
@@ -1927,40 +1928,67 @@ function initNetStatus() {
   })
 }
 
+function updateSupabaseStatus(online) {
+  const el = document.getElementById('supabaseStatus')
+  if (!el) return
+  el.className = 'supabase-status ' + (online ? 'online' : 'offline')
+  el.textContent = online ? '◉' : '◎'
+  el.title = online ? '服务器连接正常' : '服务器连接异常，部分功能不可用'
+}
+
 async function init() {
   loadTheme()
   initNetStatus()
 
-  const { data: { session } } = await supabase.auth.getSession()
-  if (session) {
-    currentUser = session.user.id
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', currentUser)
-      .single()
-    currentUserProfile = profile
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      currentUser = session.user.id
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', currentUser)
+        .single()
+      currentUserProfile = profile
+    }
+    updateSupabaseStatus(true)
+  } catch (e) {
+    console.error('Supabase init error (offline mode):', e)
+    isSupabaseOnline = false
+    updateSupabaseStatus(false)
   }
 
-  await loadIdeas()
+  try {
+    await loadIdeas()
+  } catch (e) {
+    console.error('loadIdeas error (offline mode):', e)
+    ideas = []
+    isSupabaseOnline = false
+    updateSupabaseStatus(false)
+  }
+
   updateUserUI()
   renderIdeas()
 
-  supabase.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_OUT') {
-      currentUser = null
-      currentUserProfile = null
-      updateUserUI()
-      reloadIdeas()
-    } else if (event === 'SIGNED_IN' && session) {
-      currentUser = session.user.id
-      supabase.from('profiles').select('*').eq('id', currentUser).single().then(({ data }) => {
-        currentUserProfile = data
+  try {
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        currentUser = null
+        currentUserProfile = null
         updateUserUI()
         reloadIdeas()
-      })
-    }
-  })
+      } else if (event === 'SIGNED_IN' && session) {
+        currentUser = session.user.id
+        supabase.from('profiles').select('*').eq('id', currentUser).single().then(({ data }) => {
+          currentUserProfile = data
+          updateUserUI()
+          reloadIdeas()
+        })
+      }
+    })
+  } catch (e) {
+    /* ignore */
+  }
 
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', () => setFilter(btn.dataset.filter))

@@ -3476,6 +3476,25 @@ body.reveal .content-section {
   text-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
 }
 
+.supabase-status {
+  font-size: 14px;
+  line-height: 1;
+  cursor: default;
+  transition: color 0.3s ease;
+  margin: 0 4px;
+  vertical-align: middle;
+}
+
+.supabase-status.online {
+  color: #34d399;
+  text-shadow: 0 0 6px rgba(52, 211, 153, 0.4);
+}
+
+.supabase-status.offline {
+  color: #f59e0b;
+  text-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
+}
+
 .card-action-btn.favorited {
   color: #fbbf24;
 }
