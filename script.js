@@ -1,7 +1,11 @@
-const STORAGE_KEY = 'liangmu_world'
-const USER_KEY = 'manlin_users'
-const SESSION_KEY = 'manlin_session'
 const THEME_KEY = 'manlin_theme'
+const NEWS_CACHE_KEY = 'manlin_news'
+const NEWS_CACHE_TIME = 30 * 60 * 1000
+
+const SUPABASE_URL = 'https://dilpctjvgsyeifqqhrvj.supabase.co'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpbHBjdGp2Z3N5ZWlmcXFocnZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMzc0NDksImV4cCI6MjA5NTgxMzQ0OX0.hCgveTOnErouZMFNQtQxyXBByMpwa6-9inLYTNm692Y'
+
+const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 const categoryNames = {
   idea: '科幻点子',
@@ -32,108 +36,11 @@ let editingId = null
 let deletingId = null
 let ideas = []
 let currentUser = null
+let currentUserProfile = null
 let newsCache = null
 let newsFilter = 'all'
 let currentPage = 1
 const ITEMS_PER_PAGE = 15
-const NEWS_CACHE_KEY = 'manlin_news'
-const NEWS_CACHE_TIME = 30 * 60 * 1000
-
-function formatNewsDate(dateStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return dateStr
-  const pad = (n) => String(n).padStart(2, '0')
-  const now = new Date()
-  const diff = now - d
-  if (diff < 3600000) return `${Math.floor(diff / 60000)} 分钟前`
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`
-  return `${d.getMonth() + 1}/${pad(d.getDate())}`
-}
-
-function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
-}
-
-function getIdeas() {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY)
-    return data ? JSON.parse(data).map(migrateIdea) : []
-  } catch {
-    return []
-  }
-}
-
-function saveIdeas(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-}
-
-function getUsers() {
-  try {
-    const data = localStorage.getItem(USER_KEY)
-    return data ? JSON.parse(data) : []
-  } catch {
-    return []
-  }
-}
-
-function saveUsers(data) {
-  localStorage.setItem(USER_KEY, JSON.stringify(data))
-}
-
-function getSession() {
-  try {
-    return localStorage.getItem(SESSION_KEY)
-  } catch {
-    return null
-  }
-}
-
-function setSession(account) {
-  if (account) {
-    localStorage.setItem(SESSION_KEY, account)
-  } else {
-    localStorage.removeItem(SESSION_KEY)
-  }
-}
-
-function migrateIdea(idea) {
-  if (idea.likes === undefined) idea.likes = 0
-  if (!idea.likedBy) idea.likedBy = []
-  if (!idea.comments) idea.comments = []
-  if (!idea.authorNickname) idea.authorNickname = ''
-  if (!idea.tags) idea.tags = []
-  if (idea.views === undefined) idea.views = 0
-  if (idea.comments) {
-    idea.comments.forEach(c => {
-      if (c.likes === undefined) c.likes = 0
-      if (!c.likedBy) c.likedBy = []
-      if (!c.replies) c.replies = []
-      c.replies.forEach(r => {
-        if (r.likes === undefined) r.likes = 0
-        if (!r.likedBy) r.likedBy = []
-      })
-    })
-  }
-  return idea
-}
-
-function isHtmlContent(str) {
-  return /<img[\s/>]/.test(str) || /^<(div|p|h[1-6]|span|a|b|i|u|em|strong)[\s>]/i.test(str)
-}
-
-function generateRandomNickname() {
-  const used = getUsers().map(u => u.nickname).filter(Boolean)
-  const available = randomNicknames.filter(n => !used.includes(n))
-  if (available.length === 0) return randomNicknames[Math.floor(Math.random() * randomNicknames.length)]
-  return available[Math.floor(Math.random() * available.length)]
-}
-
-function getUserNickname(account) {
-  const users = getUsers()
-  const user = users.find(u => u.account === account)
-  return user ? user.nickname : account
-}
 
 const avatarColors = [
   '#7ec8e3', '#c9a84c', '#a78bfa', '#f472b6', '#34d399',
@@ -148,10 +55,8 @@ function generateRandomAvatar(nickname) {
   return 'data:image/svg+xml,' + encodeURIComponent(svg)
 }
 
-function getUserAvatar(account) {
-  const users = getUsers()
-  const user = users.find(u => u.account === account)
-  return user && user.avatar ? user.avatar : ''
+function isHtmlContent(str) {
+  return /<img[\s/>]/.test(str) || /^<(div|p|h[1-6]|span|a|b|i|u|em|strong)[\s>]/i.test(str)
 }
 
 function maskAccount(account) {
@@ -163,35 +68,147 @@ function maskAccount(account) {
   return account.length > 6 ? account.slice(0, 3) + '****' + account.slice(-3) : account.slice(0, 2) + '****'
 }
 
-function viewUserInfo(account) {
-  if (!account) return
-  const users = getUsers()
-  const userData = users.find(u => u.account === account)
-  const userIdeas = ideas.filter(item => item.author === account)
-  const totalLikes = userIdeas.reduce((sum, item) => sum + (item.likes || 0), 0)
-  const totalComments = userIdeas.reduce((sum, item) => sum + (item.comments ? item.comments.length : 0), 0)
-
-  document.getElementById('userInfoNickname').textContent = userData ? getUserNickname(account) : '已注销'
-  document.getElementById('userInfoAccount').textContent = account === currentUser ? account : maskAccount(account)
-  document.getElementById('userInfoJoinDate').textContent = userData ? `注册于 ${formatDate(userData.createdAt)}` : '-'
-  document.getElementById('userInfoStatPosts').textContent = userIdeas.length
-  document.getElementById('userInfoStatLikes').textContent = totalLikes
-  document.getElementById('userInfoStatComments').textContent = totalComments
-
-  const avatarEl = document.querySelector('#userInfoModal .profile-avatar-large')
-  if (userData && userData.avatar) {
-    avatarEl.innerHTML = `<img class="avatar-img" src="${userData.avatar}" alt="">`
-  } else {
-    avatarEl.innerHTML = '✦'
-  }
-
-  openModal('userInfoModal')
-}
-
 function formatDate(isoStr) {
   const d = new Date(isoStr)
   const pad = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function formatNewsDate(dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+  const pad = (n) => String(n).padStart(2, '0')
+  const now = new Date()
+  const diff = now - d
+  if (diff < 3600000) return `${Math.floor(diff / 60000)} 分钟前`
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`
+  return `${d.getMonth() + 1}/${pad(d.getDate())}`
+}
+
+function generateRandomNickname() {
+  const available = randomNicknames.filter(n => {
+    if (currentUserProfile && currentUserProfile.nickname === n) return false
+    return true
+  })
+  if (available.length === 0) return randomNicknames[Math.floor(Math.random() * randomNicknames.length)]
+  return available[Math.floor(Math.random() * available.length)]
+}
+
+async function checkNicknameExists(nickname) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('nickname', nickname)
+    .maybeSingle()
+  if (error) return false
+  return !!data
+}
+
+async function loadIdeas() {
+  const { data: ideasData, error } = await supabase
+    .from('ideas')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('loadIdeas error:', error)
+    ideas = []
+    return
+  }
+
+  const ideaIds = ideasData.map(i => i.id)
+
+  const { data: commentsData } = await supabase
+    .from('comments')
+    .select('*')
+    .in('idea_id', ideaIds)
+    .order('created_at', { ascending: true })
+
+  const commentIds = (commentsData || []).map(c => c.id)
+
+  const { data: repliesData } = await supabase
+    .from('replies')
+    .select('*')
+    .in('comment_id', commentIds)
+    .order('created_at', { ascending: true })
+
+  const commentsByIdea = {}
+  ;(commentsData || []).forEach(c => {
+    if (!commentsByIdea[c.idea_id]) commentsByIdea[c.idea_id] = []
+    commentsByIdea[c.idea_id].push(c)
+  })
+
+  const repliesByComment = {}
+  ;(repliesData || []).forEach(r => {
+    if (!repliesByComment[r.comment_id]) repliesByComment[r.comment_id] = []
+    repliesByComment[r.comment_id].push(r)
+  })
+
+  const userIds = new Set()
+  ideasData.forEach(i => { if (i.author_id) userIds.add(i.author_id) })
+  commentsData.forEach(c => { if (c.author_id) userIds.add(c.author_id) })
+  repliesData.forEach(r => { if (r.author_id) userIds.add(r.author_id) })
+
+  let profilesMap = {}
+  if (userIds.size > 0) {
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('*')
+      .in('id', Array.from(userIds))
+    if (profilesData) {
+      profilesData.forEach(p => { profilesMap[p.id] = p })
+    }
+  }
+
+  ideas = ideasData.map(idea => {
+    const ideaComments = (commentsByIdea[idea.id] || []).map(c => {
+      const cProfile = profilesMap[c.author_id] || {}
+      const cReplies = (repliesByComment[c.id] || []).map(r => {
+        const rProfile = profilesMap[r.author_id] || {}
+        return {
+          id: r.id,
+          text: r.text,
+          author: r.author_id,
+          authorNickname: rProfile.nickname || '匿名',
+          createdAt: r.created_at,
+          likes: r.likes || 0,
+          likedBy: r.liked_by || []
+        }
+      })
+      return {
+        id: c.id,
+        text: c.text,
+        author: c.author_id,
+        authorNickname: cProfile.nickname || '匿名',
+        createdAt: c.created_at,
+        likes: c.likes || 0,
+        likedBy: c.liked_by || [],
+        replies: cReplies
+      }
+    })
+
+    const authorProfile = profilesMap[idea.author_id] || {}
+    return {
+      id: idea.id,
+      title: idea.title,
+      content: idea.content,
+      category: idea.category,
+      tags: idea.tags || [],
+      author: idea.author_id,
+      authorNickname: authorProfile.nickname || '匿名探测员',
+      createdAt: idea.created_at,
+      likes: idea.likes || 0,
+      likedBy: idea.liked_by || [],
+      views: idea.views || 0,
+      comments: ideaComments
+    }
+  })
+}
+
+async function reloadIdeas() {
+  await loadIdeas()
+  renderIdeas()
 }
 
 function getDisplayIdeas() {
@@ -199,14 +216,7 @@ function getDisplayIdeas() {
 
   if (currentFilter === 'favorites') {
     if (!currentUser) return []
-    const users = getUsers()
-    const userData = users.find(u => u.account === currentUser)
-    if (userData && userData.favorites && userData.favorites.length > 0) {
-      result = result.filter(item => userData.favorites.includes(item.id))
-    } else {
-      return []
-    }
-    return result
+    return result.filter(item => currentUserProfile && currentUserProfile.favorites && currentUserProfile.favorites.includes(item.id))
   }
 
   if (currentFilter !== 'all') {
@@ -297,9 +307,7 @@ function renderIdeas() {
     const commentCount = item.comments ? item.comments.length : 0
     const hotness = likeCount + commentCount
     const isLiked = isLoggedIn && item.likedBy && item.likedBy.includes(user)
-    const usersList = getUsers()
-    const curUserData = isLoggedIn ? usersList.find(u => u.account === user) : null
-    const isFavorited = isLoggedIn && curUserData && curUserData.favorites && curUserData.favorites.includes(item.id)
+    const isFavorited = isLoggedIn && currentUserProfile && currentUserProfile.favorites && currentUserProfile.favorites.includes(item.id)
     const style = `animation-delay: ${index * 0.06}s`
     const authorAvatar = getUserAvatar(item.author)
 
@@ -312,14 +320,14 @@ function renderIdeas() {
     const commentsHtml = item.comments && item.comments.length > 0
       ? item.comments.map(c => {
           const cText = c.text.replace(/</g, '&lt;').replace(/>/g, '&gt;')
-          const cNickname = getUserNickname(c.author) || '匿名'
+          const cNickname = c.authorNickname || '匿名'
           const cAvatar = getUserAvatar(c.author)
           const cAvatarHtml = cAvatar ? `<img class="comment-avatar-img" src="${cAvatar}" alt="">` : '<div class="comment-avatar">✦</div>'
           const cIsLiked = isLoggedIn && c.likedBy && c.likedBy.includes(user)
           const repliesHtml = c.replies && c.replies.length > 0
             ? c.replies.map(r => {
                 const rText = r.text.replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                const rNickname = getUserNickname(r.author) || '匿名'
+                const rNickname = r.authorNickname || '匿名'
                 const rAvatar = getUserAvatar(r.author)
                 const rAvatarHtml = rAvatar ? `<img class="comment-avatar-img" src="${rAvatar}" alt="">` : '<div class="comment-avatar">✦</div>'
                 const rIsLiked = isLoggedIn && r.likedBy && r.likedBy.includes(user)
@@ -541,7 +549,7 @@ function attachCardEvents() {
   })
 }
 
-function handleLike(id) {
+async function handleLike(id) {
   if (!currentUser) {
     showToast('请先登录后点赞', 'failure')
     return
@@ -556,15 +564,24 @@ function handleLike(id) {
   const idx = idea.likedBy.indexOf(currentUser)
   const wasNotLiked = idx === -1
 
+  let newLikedBy = [...idea.likedBy]
+  let newLikes = idea.likes
+
   if (idx > -1) {
-    idea.likedBy.splice(idx, 1)
-    idea.likes = Math.max(0, idea.likes - 1)
+    newLikedBy.splice(idx, 1)
+    newLikes = Math.max(0, idea.likes - 1)
   } else {
-    idea.likedBy.push(currentUser)
-    idea.likes = (idea.likes || 0) + 1
+    newLikedBy.push(currentUser)
+    newLikes = (idea.likes || 0) + 1
   }
 
-  saveIdeas(ideas)
+  await supabase
+    .from('ideas')
+    .update({ likes: newLikes, liked_by: newLikedBy })
+    .eq('id', id)
+
+  idea.likedBy = newLikedBy
+  idea.likes = newLikes
   renderIdeas()
 
   if (wasNotLiked) {
@@ -576,7 +593,7 @@ function handleLike(id) {
   }
 }
 
-function toggleComments(id) {
+async function toggleComments(id) {
   const el = document.getElementById(`comments-${id}`)
   if (!el) return
   const wasClosed = !el.classList.contains('open')
@@ -584,10 +601,14 @@ function toggleComments(id) {
   if (wasClosed) {
     const idea = ideas.find(item => item.id === id)
     if (idea) {
-      idea.views = (idea.views || 0) + 1
+      const newViews = (idea.views || 0) + 1
+      await supabase
+        .from('ideas')
+        .update({ views: newViews })
+        .eq('id', id)
+      idea.views = newViews
       const viewEl = document.querySelector(`[data-id="${id}"] .card-view-count`)
       if (viewEl) viewEl.textContent = idea.views
-      saveIdeas(ideas)
     }
   }
 }
@@ -612,10 +633,8 @@ function openDetailModal(id) {
   const idea = ideas.find(item => item.id === id)
   if (!idea) return
 
-  const users = getUsers()
-  const authorData = users.find(u => u.account === idea.author)
-  const authorNickname = authorData ? authorData.nickname : (idea.authorNickname || '匿名探测员')
-  const authorAvatar = authorData ? authorData.avatar : ''
+  const authorNickname = idea.authorNickname || '匿名探测员'
+  const authorAvatar = getUserAvatar(idea.author)
   const date = formatDate(idea.createdAt)
   const catNames = { idea: '科幻点子', concept: '科幻概念', story: '科幻故事', tech: '科技资讯' }
   const catName = catNames[idea.category] || '科幻点子'
@@ -655,7 +674,7 @@ function handleDelete(id) {
   openModal('confirmModal')
 }
 
-function handleSubmitComment(id) {
+async function handleSubmitComment(id) {
   if (!currentUser) {
     showToast('请先登录后评论', 'failure')
     return
@@ -667,24 +686,33 @@ function handleSubmitComment(id) {
   const text = input.value.trim()
   if (!text) return
 
+  const { data, error } = await supabase
+    .from('comments')
+    .insert({ idea_id: id, author_id: currentUser, text })
+    .select()
+    .single()
+
+  if (error) {
+    showToast('评论发送失败', 'failure')
+    return
+  }
+
   const idea = ideas.find(item => item.id === id)
-  if (!idea) return
+  if (idea) {
+    if (!idea.comments) idea.comments = []
+    idea.comments.push({
+      id: data.id,
+      text,
+      author: currentUser,
+      authorNickname: currentUserProfile ? currentUserProfile.nickname : '匿名',
+      createdAt: data.created_at,
+      likes: 0,
+      likedBy: [],
+      replies: []
+    })
+  }
 
-  if (!idea.comments) idea.comments = []
-
-  idea.comments.push({
-    id: generateId(),
-    text,
-    author: currentUser,
-    createdAt: new Date().toISOString(),
-    likes: 0,
-    likedBy: [],
-    replies: []
-  })
-
-  saveIdeas(ideas)
   input.value = ''
-
   const el = document.getElementById(`comments-${id}`)
   if (el && !el.classList.contains('open')) {
     el.classList.add('open')
@@ -693,7 +721,7 @@ function handleSubmitComment(id) {
   renderIdeas()
 }
 
-function handleCommentLike(ideaId, commentId) {
+async function handleCommentLike(ideaId, commentId) {
   if (!currentUser) {
     showToast('请先登录后点赞', 'failure')
     return
@@ -706,14 +734,21 @@ function handleCommentLike(ideaId, commentId) {
   if (comment.likes === undefined) comment.likes = 0
   const wasNotLiked = !comment.likedBy.includes(currentUser)
   const idx = comment.likedBy.indexOf(currentUser)
+  let newLikedBy = [...comment.likedBy]
+  let newLikes = comment.likes
   if (idx > -1) {
-    comment.likedBy.splice(idx, 1)
-    comment.likes = Math.max(0, comment.likes - 1)
+    newLikedBy.splice(idx, 1)
+    newLikes = Math.max(0, comment.likes - 1)
   } else {
-    comment.likedBy.push(currentUser)
-    comment.likes = (comment.likes || 0) + 1
+    newLikedBy.push(currentUser)
+    newLikes = (comment.likes || 0) + 1
   }
-  saveIdeas(ideas)
+  await supabase
+    .from('comments')
+    .update({ likes: newLikes, liked_by: newLikedBy })
+    .eq('id', commentId)
+  comment.likedBy = newLikedBy
+  comment.likes = newLikes
   renderIdeas()
   if (wasNotLiked) {
     const btn = document.querySelector(`[data-action="commentLike"][data-idea-id="${ideaId}"][data-comment-id="${commentId}"]`)
@@ -724,7 +759,7 @@ function handleCommentLike(ideaId, commentId) {
   }
 }
 
-function handleReplyLike(ideaId, commentId, replyId) {
+async function handleReplyLike(ideaId, commentId, replyId) {
   if (!currentUser) {
     showToast('请先登录后点赞', 'failure')
     return
@@ -739,14 +774,21 @@ function handleReplyLike(ideaId, commentId, replyId) {
   if (reply.likes === undefined) reply.likes = 0
   const wasNotLiked = !reply.likedBy.includes(currentUser)
   const idx = reply.likedBy.indexOf(currentUser)
+  let newLikedBy = [...reply.likedBy]
+  let newLikes = reply.likes
   if (idx > -1) {
-    reply.likedBy.splice(idx, 1)
-    reply.likes = Math.max(0, reply.likes - 1)
+    newLikedBy.splice(idx, 1)
+    newLikes = Math.max(0, reply.likes - 1)
   } else {
-    reply.likedBy.push(currentUser)
-    reply.likes = (reply.likes || 0) + 1
+    newLikedBy.push(currentUser)
+    newLikes = (reply.likes || 0) + 1
   }
-  saveIdeas(ideas)
+  await supabase
+    .from('replies')
+    .update({ likes: newLikes, liked_by: newLikedBy })
+    .eq('id', replyId)
+  reply.likedBy = newLikedBy
+  reply.likes = newLikes
   renderIdeas()
   if (wasNotLiked) {
     const btn = document.querySelector(`[data-action="replyLike"][data-idea-id="${ideaId}"][data-comment-id="${commentId}"][data-reply-id="${replyId}"]`)
@@ -771,7 +813,7 @@ function handleToggleReply(ideaId, commentId) {
   }
 }
 
-function handleSubmitReply(ideaId, commentId) {
+async function handleSubmitReply(ideaId, commentId) {
   if (!currentUser) {
     showToast('请先登录后回复', 'failure')
     return
@@ -786,15 +828,28 @@ function handleSubmitReply(ideaId, commentId) {
   const comment = idea.comments.find(c => c.id === commentId)
   if (!comment) return
   if (!comment.replies) comment.replies = []
+
+  const { data, error } = await supabase
+    .from('replies')
+    .insert({ comment_id: commentId, author_id: currentUser, text })
+    .select()
+    .single()
+
+  if (error) {
+    showToast('回复发送失败', 'failure')
+    return
+  }
+
   comment.replies.push({
-    id: generateId(),
+    id: data.id,
     text,
     author: currentUser,
-    createdAt: new Date().toISOString(),
+    authorNickname: currentUserProfile ? currentUserProfile.nickname : '匿名',
+    createdAt: data.created_at,
     likes: 0,
     likedBy: []
   })
-  saveIdeas(ideas)
+
   input.value = ''
   const form = document.getElementById(`replyForm-${ideaId}-${commentId}`)
   if (form) form.style.display = 'none'
@@ -805,24 +860,30 @@ function handleSubmitReply(ideaId, commentId) {
   renderIdeas()
 }
 
-function handleFavorite(id) {
+async function handleFavorite(id) {
   if (!currentUser) {
     showToast('请先登录后收藏', 'failure')
     return
   }
-  const users = getUsers()
-  const userData = users.find(u => u.account === currentUser)
-  if (!userData) return
-  if (!userData.favorites) userData.favorites = []
-  const idx = userData.favorites.indexOf(id)
+  if (!currentUserProfile) return
+  if (!currentUserProfile.favorites) currentUserProfile.favorites = []
+
+  const idx = currentUserProfile.favorites.indexOf(id)
   if (idx > -1) {
-    userData.favorites.splice(idx, 1)
+    currentUserProfile.favorites.splice(idx, 1)
+    await supabase
+      .from('profiles')
+      .update({ favorites: currentUserProfile.favorites })
+      .eq('id', currentUser)
     showToast('已取消收藏', 'failure')
   } else {
-    userData.favorites.push(id)
+    currentUserProfile.favorites.push(id)
+    await supabase
+      .from('profiles')
+      .update({ favorites: currentUserProfile.favorites })
+      .eq('id', currentUser)
     showToast('已收藏', 'success')
   }
-  saveUsers(users)
   renderIdeas()
 }
 
@@ -1160,7 +1221,7 @@ function setTag(tag) {
   renderIdeas()
 }
 
-function handlePublish(e) {
+async function handlePublish(e) {
   e.preventDefault()
 
   if (!currentUser) {
@@ -1176,25 +1237,45 @@ function handlePublish(e) {
   const activeCat = document.querySelector('.cat-option.active')
   const category = activeCat ? activeCat.dataset.value : 'idea'
 
-  const nickname = getUserNickname(currentUser)
+  const nickname = currentUserProfile ? currentUserProfile.nickname : '匿名探测员'
   const tagsRaw = document.getElementById('ideaTags').value.trim()
   const tags = tagsRaw
     ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean)
     : []
 
-  const newIdea = migrateIdea({
-    id: generateId(),
+  const { data, error } = await supabase
+    .from('ideas')
+    .insert({
+      title,
+      content,
+      category,
+      tags,
+      author_id: currentUser
+    })
+    .select()
+    .single()
+
+  if (error) {
+    showToast('发布失败，请重试', 'failure')
+    return
+  }
+
+  const newIdea = {
+    id: data.id,
     title,
     content,
     category,
     tags,
     author: currentUser,
     authorNickname: nickname,
-    createdAt: new Date().toISOString()
-  })
+    createdAt: data.created_at,
+    likes: 0,
+    likedBy: [],
+    views: 0,
+    comments: []
+  }
 
-  ideas.push(newIdea)
-  saveIdeas(ideas)
+  ideas.unshift(newIdea)
   renderIdeas()
 
   document.getElementById('publishForm').reset()
@@ -1209,7 +1290,7 @@ function handlePublish(e) {
   closePublishForm()
 }
 
-function handleEditSubmit(e) {
+async function handleEditSubmit(e) {
   e.preventDefault()
 
   const title = document.getElementById('editTitle').value.trim()
@@ -1227,12 +1308,16 @@ function handleEditSubmit(e) {
   const idea = ideas.find(item => item.id === editingId)
   if (!idea) return
 
+  await supabase
+    .from('ideas')
+    .update({ title, content, category, tags, updated_at: new Date().toISOString() })
+    .eq('id', editingId)
+
   idea.title = title
   idea.content = content
   idea.category = category
   idea.tags = tags
 
-  saveIdeas(ideas)
   renderIdeas()
 
   editingId = null
@@ -1297,22 +1382,22 @@ function handleImageUpload() {
   input.value = ''
 }
 
-function confirmDelete() {
+async function confirmDelete() {
   if (!deletingId) return
 
   if (deletingId === 'ACCOUNT_DELETE') {
-    let users = getUsers()
-    users = users.filter(u => u.account !== currentUser)
-    saveUsers(users)
-    handleLogout()
+    showToast('如需注销账号，请联系管理员', 'failure')
     deletingId = null
     closeModal('confirmModal')
-    showToast('账号已注销', 'success')
     return
   }
 
+  await supabase
+    .from('ideas')
+    .delete()
+    .eq('id', deletingId)
+
   ideas = ideas.filter(item => item.id !== deletingId)
-  saveIdeas(ideas)
   renderIdeas()
   deletingId = null
   closeModal('confirmModal')
@@ -1336,11 +1421,11 @@ function updateUserUI() {
   const avatarEl = document.getElementById('userAvatar')
   const favBtn = document.getElementById('filterFavBtn')
 
-  if (currentUser) {
+  if (currentUser && currentUserProfile) {
     guest.style.display = 'none'
     logged.style.display = 'flex'
-    nameEl.textContent = getUserNickname(currentUser)
-    const avatar = getUserAvatar(currentUser)
+    nameEl.textContent = currentUserProfile.nickname || '探测员'
+    const avatar = currentUserProfile.avatar || ''
     avatarEl.innerHTML = avatar ? `<img class="avatar-img" src="${avatar}" alt="">` : '✦'
     if (favBtn) favBtn.style.display = ''
   } else {
@@ -1373,14 +1458,14 @@ function closeModal(id) {
   document.getElementById(id).classList.remove('active')
 }
 
-function handleRegister(e) {
+async function handleRegister(e) {
   e.preventDefault()
-  const account = document.getElementById('regAccount').value.trim()
+  const email = document.getElementById('regAccount').value.trim()
   const nickname = document.getElementById('regNickname').value.trim()
   const password = document.getElementById('regPassword').value
   const confirm = document.getElementById('regConfirm').value
 
-  if (!account || !nickname || !password || !confirm) return
+  if (!email || !nickname || !password || !confirm) return
 
   if (nickname.length > 15) {
     showToast('注册失败：昵称不得超过 15 个字符', 'failure')
@@ -1397,78 +1482,95 @@ function handleRegister(e) {
     return
   }
 
-  const users = getUsers()
-  const exists = users.some(u => u.account === account)
-  if (exists) {
-    showToast('注册失败：该账号已被注册', 'failure')
-    return
-  }
-
-  const nickExists = users.some(u => u.nickname === nickname)
+  const nickExists = await checkNicknameExists(nickname)
   if (nickExists) {
     showToast('抱歉探测员，昵称已有人编写', 'failure')
     return
   }
 
-  users.push({ id: generateId(), account, nickname, password, avatar: generateRandomAvatar(nickname), createdAt: new Date().toISOString(), favorites: [] })
-  saveUsers(users)
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { nickname }
+    }
+  })
+
+  if (error) {
+    if (error.message.includes('already registered')) {
+      showToast('注册失败：该邮箱已被注册', 'failure')
+    } else {
+      showToast('注册失败：' + error.message, 'failure')
+    }
+    return
+  }
+
   showToast('注册成功', 'success')
   closeModal('registerModal')
   document.getElementById('registerForm').reset()
 }
 
-function handleLogin(e) {
+async function handleLogin(e) {
   e.preventDefault()
-  const account = document.getElementById('loginAccount').value.trim()
+  const email = document.getElementById('loginAccount').value.trim()
   const password = document.getElementById('loginPassword').value
-  if (!account || !password) return
+  if (!email || !password) return
 
-  const users = getUsers()
-  const user = users.find(u => u.account === account && u.password === password)
-  if (!user) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  })
+
+  if (error) {
     showToast('登录失败：账号或密码错误', 'failure')
     return
   }
 
-  currentUser = user.account
-  setSession(currentUser)
+  currentUser = data.user.id
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', currentUser)
+    .single()
+
+  currentUserProfile = profile
+
   updateUserUI()
+  await reloadIdeas()
   showToast('登录成功', 'success')
   closeModal('loginModal')
   document.getElementById('loginForm').reset()
-  renderIdeas()
 }
 
-function handleLogout() {
+async function handleLogout() {
+  await supabase.auth.signOut()
   currentUser = null
-  setSession(null)
+  currentUserProfile = null
   updateUserUI()
-  renderIdeas()
+  await reloadIdeas()
 }
 
 function openAbout() {
   openModal('aboutModal')
 }
 
-function openProfile() {
+async function openProfile() {
   if (!currentUser) return
 
   const userIdeas = ideas.filter(item => item.author === currentUser)
   const totalLikes = userIdeas.reduce((sum, item) => sum + (item.likes || 0), 0)
   const totalViews = userIdeas.reduce((sum, item) => sum + (item.views || 0), 0)
   const totalComments = userIdeas.reduce((sum, item) => sum + (item.comments ? item.comments.length : 0), 0)
-  const users = getUsers()
-  const userData = users.find(u => u.account === currentUser)
-  const favCount = userData && userData.favorites ? userData.favorites.length : 0
+  const favCount = currentUserProfile && currentUserProfile.favorites ? currentUserProfile.favorites.length : 0
 
-  document.getElementById('profileAccount').textContent = getUserNickname(currentUser)
-  document.getElementById('profileJoinDate').textContent = userData
-    ? `注册于 ${formatDate(userData.createdAt)}`
+  document.getElementById('profileAccount').textContent = currentUserProfile ? currentUserProfile.nickname : '探测员'
+  document.getElementById('profileJoinDate').textContent = currentUserProfile
+    ? `注册于 ${formatDate(currentUserProfile.created_at)}`
     : '-'
 
   const avatarEl = document.querySelector('#profileModal .profile-avatar-large')
-  if (userData && userData.avatar) {
-    avatarEl.innerHTML = `<img class="avatar-img" src="${userData.avatar}" alt="">`
+  if (currentUserProfile && currentUserProfile.avatar) {
+    avatarEl.innerHTML = `<img class="avatar-img" src="${currentUserProfile.avatar}" alt="">`
   } else {
     avatarEl.innerHTML = '✦'
   }
@@ -1504,35 +1606,29 @@ function openProfile() {
 }
 
 function openSettings() {
-  if (!currentUser) return
-  const users = getUsers()
-  const userData = users.find(u => u.account === currentUser)
-  if (!userData) return
-  document.getElementById('settingsNickname').value = userData.nickname || ''
+  if (!currentUser || !currentUserProfile) return
+  document.getElementById('settingsNickname').value = currentUserProfile.nickname || ''
   document.getElementById('settingsCurrPwd').value = ''
   document.getElementById('settingsNewPwd').value = ''
   document.getElementById('settingsConfirmPwd').value = ''
   const avatarPreview = document.getElementById('settingsAvatarPreview')
-  avatarPreview.src = userData.avatar || ''
+  avatarPreview.src = currentUserProfile.avatar || ''
   openModal('settingsModal')
 }
 
-function handleUpdateSettings(e) {
+async function handleUpdateSettings(e) {
   e.preventDefault()
-  if (!currentUser) return
-  const users = getUsers()
-  const userIdx = users.findIndex(u => u.account === currentUser)
-  if (userIdx === -1) return
+  if (!currentUser || !currentUserProfile) return
 
   const newNickname = document.getElementById('settingsNickname').value.trim()
-  if (newNickname) {
+  if (newNickname && newNickname !== currentUserProfile.nickname) {
     if (newNickname.length > 15) {
       showToast('昵称不得超过 15 个字符', 'failure')
       return
     }
-    const nickExists = users.some((u, i) => i !== userIdx && u.nickname === newNickname)
+    const nickExists = await checkNicknameExists(newNickname)
     if (nickExists) { showToast('抱歉探测员，昵称已有人编写', 'failure'); return }
-    users[userIdx].nickname = newNickname
+    currentUserProfile.nickname = newNickname
   }
 
   const currPwd = document.getElementById('settingsCurrPwd').value
@@ -1540,20 +1636,34 @@ function handleUpdateSettings(e) {
   const confirmPwd = document.getElementById('settingsConfirmPwd').value
 
   if (currPwd || newPwd || confirmPwd) {
-    if (users[userIdx].password !== currPwd) { showToast('当前密码错误', 'failure'); return }
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: (await supabase.auth.getUser()).data.user.email,
+      password: currPwd
+    })
+    if (signInError) { showToast('当前密码错误', 'failure'); return }
     if (newPwd && newPwd.length < 6) { showToast('新密码至少 6 位', 'failure'); return }
     if (newPwd !== confirmPwd) { showToast('两次新密码不一致', 'failure'); return }
-    if (newPwd) users[userIdx].password = newPwd
+    if (newPwd) {
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPwd })
+      if (updateError) { showToast('密码修改失败', 'failure'); return }
+    }
   }
 
   const avatarPreview = document.getElementById('settingsAvatarPreview')
   const avatarSrc = avatarPreview.getAttribute('src')
-  const oldAvatar = users[userIdx].avatar
+  const oldAvatar = currentUserProfile.avatar
   if (avatarSrc) {
-    users[userIdx].avatar = avatarSrc
+    currentUserProfile.avatar = avatarSrc
   }
 
-  saveUsers(users)
+  await supabase
+    .from('profiles')
+    .update({
+      nickname: currentUserProfile.nickname,
+      avatar: currentUserProfile.avatar
+    })
+    .eq('id', currentUser)
+
   const avatarChanged = avatarSrc && avatarSrc !== oldAvatar
   if (newNickname || avatarChanged) { updateUserUI(); renderIdeas() }
   closeModal('settingsModal')
@@ -1756,21 +1866,101 @@ function handleSplashEnter() {
   requestAnimationFrame(animateProgress)
 }
 
-function init() {
-  ideas = getIdeas()
+function getUserAvatar(userId) {
+  if (!userId) return ''
+  if (currentUser === userId && currentUserProfile) {
+    return currentUserProfile.avatar || ''
+  }
+  return ''
+}
+
+async function viewUserInfo(userId) {
+  if (!userId) return
+
+  const { data: userProfile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single()
+
+  const userIdeas = ideas.filter(item => item.author === userId)
+  const totalLikes = userIdeas.reduce((sum, item) => sum + (item.likes || 0), 0)
+  const totalComments = userIdeas.reduce((sum, item) => sum + (item.comments ? item.comments.length : 0), 0)
+
+  document.getElementById('userInfoNickname').textContent = userProfile ? userProfile.nickname : '已注销'
+  document.getElementById('userInfoAccount').textContent = userId === currentUser ? (currentUserProfile ? currentUserProfile.nickname : userId) : maskAccount(userId)
+  document.getElementById('userInfoJoinDate').textContent = userProfile ? `注册于 ${formatDate(userProfile.created_at)}` : '-'
+  document.getElementById('userInfoStatPosts').textContent = userIdeas.length
+  document.getElementById('userInfoStatLikes').textContent = totalLikes
+  document.getElementById('userInfoStatComments').textContent = totalComments
+
+  const avatarEl = document.querySelector('#userInfoModal .profile-avatar-large')
+  if (userProfile && userProfile.avatar) {
+    avatarEl.innerHTML = `<img class="avatar-img" src="${userProfile.avatar}" alt="">`
+  } else {
+    avatarEl.innerHTML = '✦'
+  }
+
+  openModal('userInfoModal')
+}
+
+function initNetStatus() {
+  const el = document.getElementById('netStatus')
+  if (!el) return
+
+  function update(status) {
+    el.className = 'net-status ' + status
+    el.textContent = status === 'online' ? '●' : '○'
+    el.title = status === 'online' ? '网络连接正常' : '网络已断开'
+  }
+
+  update(navigator.onLine ? 'online' : 'offline')
+
+  window.addEventListener('online', () => {
+    update('online')
+    showToast('网络已恢复连接', 'success')
+  })
+
+  window.addEventListener('offline', () => {
+    update('offline')
+    showToast('网络连接已断开，部分功能可能不可用', 'failure')
+  })
+}
+
+async function init() {
   loadTheme()
   initNetStatus()
-  const savedSession = getSession()
-  if (savedSession) {
-    const users = getUsers()
-    if (users.find(u => u.account === savedSession)) {
-      currentUser = savedSession
-    } else {
-      setSession(null)
-    }
+
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session) {
+    currentUser = session.user.id
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', currentUser)
+      .single()
+    currentUserProfile = profile
   }
+
+  await loadIdeas()
   updateUserUI()
   renderIdeas()
+
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT') {
+      currentUser = null
+      currentUserProfile = null
+      updateUserUI()
+      reloadIdeas()
+    } else if (event === 'SIGNED_IN' && session) {
+      currentUser = session.user.id
+      supabase.from('profiles').select('*').eq('id', currentUser).single().then(({ data }) => {
+        currentUserProfile = data
+        updateUserUI()
+        reloadIdeas()
+      })
+    }
+  })
 
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', () => setFilter(btn.dataset.filter))
@@ -1905,10 +2095,8 @@ function init() {
   })
   document.getElementById('avatarUpload').addEventListener('change', handleAvatarUpload)
   document.getElementById('btnRandomAvatar').addEventListener('click', () => {
-    const users = getUsers()
-    const userData = users.find(u => u.account === currentUser)
-    if (!userData) return
-    const avatar = generateRandomAvatar(userData.nickname || currentUser)
+    if (!currentUserProfile) return
+    const avatar = generateRandomAvatar(currentUserProfile.nickname || '用户')
     document.getElementById('settingsAvatarPreview').src = avatar
   })
 
@@ -1930,34 +2118,8 @@ function init() {
         overlay.classList.remove('active')
         if (overlay.id === 'editModal') editingId = null
         if (overlay.id === 'confirmModal') deletingId = null
-        if (overlay.id === 'userInfoModal') { /* no state to reset */ }
-        if (overlay.id === 'settingsModal') { /* no state to reset */ }
-        if (overlay.id === 'cropModal') { /* no state to reset */ }
       }
     })
-  })
-}
-
-function initNetStatus() {
-  const el = document.getElementById('netStatus')
-  if (!el) return
-
-  function update(status) {
-    el.className = 'net-status ' + status
-    el.textContent = status === 'online' ? '●' : '○'
-    el.title = status === 'online' ? '网络连接正常' : '网络已断开'
-  }
-
-  update(navigator.onLine ? 'online' : 'offline')
-
-  window.addEventListener('online', () => {
-    update('online')
-    showToast('网络已恢复连接', 'success')
-  })
-
-  window.addEventListener('offline', () => {
-    update('offline')
-    showToast('网络连接已断开，部分功能可能不可用', 'failure')
   })
 }
 
