@@ -368,6 +368,7 @@ function renderIdeas() {
         <h3 class="card-title">${escapedTitle}</h3>
         ${tagsHtml}
         <div class="markdown-content">${renderedContent}</div>
+        <div class="card-expand" data-action="view" data-id="${item.id}">展开全文 ▸</div>
         <div class="card-meta">
           <span class="card-author" data-author="${item.author || ''}">${authorAvatar ? `<img class="card-author-avatar" src="${authorAvatar}" alt="">` : ''}${item.authorNickname || '匿名探测员'}</span>
           <span class="card-time">${formatDate(item.createdAt)}</span>
@@ -492,6 +493,14 @@ function attachCardEvents() {
     })
   })
 
+  document.querySelectorAll('[data-action="view"]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation()
+      openDetailModal(el.dataset.id)
+    })
+  })
+})
+
   document.querySelectorAll('[data-action="commentLike"]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation()
@@ -598,6 +607,48 @@ function handleEdit(id) {
   })
 
   openModal('editModal')
+}
+
+function openDetailModal(id) {
+  const idea = ideas.find(item => item.id === id)
+  if (!idea) return
+
+  const users = getUsers()
+  const authorData = users.find(u => u.account === idea.author)
+  const authorNickname = authorData ? authorData.nickname : (idea.authorNickname || '匿名探测员')
+  const authorAvatar = authorData ? authorData.avatar : ''
+  const date = formatDate(idea.createdAt)
+  const catNames = { idea: '科幻点子', concept: '科幻概念', story: '科幻故事', tech: '科技资讯' }
+  const catName = catNames[idea.category] || '科幻点子'
+
+  let renderedContent = idea.content
+  if (typeof marked !== 'undefined' && !isHtmlContent(idea.content)) {
+    renderedContent = marked.parse(idea.content)
+  }
+
+  const tagsHtml = idea.tags && idea.tags.length > 0
+    ? '<div class="detail-tags">' + idea.tags.map(t => `<span class="detail-tag">${t.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`).join('') + '</div>'
+    : ''
+
+  const body = document.getElementById('detailBody')
+  body.innerHTML = `
+    <div class="detail-header">
+      <h2 class="detail-idea-title">${idea.title.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h2>
+      <div class="detail-meta">
+        ${authorAvatar ? `<img class="detail-avatar" src="${authorAvatar}" alt="">` : ''}
+        <span class="detail-author">${authorNickname}</span>
+        <span class="detail-sep">·</span>
+        <span class="detail-cat">${catName}</span>
+        <span class="detail-sep">·</span>
+        <span class="detail-date">${date}</span>
+      </div>
+      ${tagsHtml}
+    </div>
+    <div class="detail-divider"></div>
+    <div class="detail-idea-content markdown-content-full">${renderedContent}</div>
+  `
+
+  openModal('detailModal')
 }
 
 function handleDelete(id) {
@@ -1841,6 +1892,10 @@ function init() {
   })
   document.getElementById('settingsForm').addEventListener('submit', handleUpdateSettings)
   document.getElementById('btnCloseUserInfo').addEventListener('click', () => closeModal('userInfoModal'))
+  document.getElementById('btnCloseDetail').addEventListener('click', () => closeModal('detailModal'))
+  document.getElementById('detailModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeModal('detailModal')
+  })
   document.getElementById('btnUploadAvatar').addEventListener('click', () => {
     document.getElementById('avatarUpload').click()
   })
