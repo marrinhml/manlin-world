@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "api/news.js": {
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/$1" }
+  ]
+}

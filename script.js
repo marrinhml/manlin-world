@@ -903,7 +903,7 @@ async function fetchNews() {
     </div>`
 
   try {
-    const res = await fetch('/.netlify/functions/news')
+    const res = await fetch('/api/news')
     if (!res.ok) throw new Error('信号中断')
     const data = await res.json()
 
@@ -960,7 +960,7 @@ async function refreshNews() {
     </div>`
 
   try {
-    const res = await fetch('/.netlify/functions/news?_=' + Date.now())
+    const res = await fetch('/api/news?_=' + Date.now())
     if (!res.ok) throw new Error('信号中断')
     const data = await res.json()
 
