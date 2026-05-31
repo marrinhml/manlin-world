@@ -957,7 +957,7 @@ body {
   color: var(--gold);
 }
 
-.detail-card {
+.modal-card.detail-card {
   max-width: 680px;
   max-height: calc(100vh - 60px);
   padding: 24px 32px;
