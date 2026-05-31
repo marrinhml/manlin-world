@@ -17,6 +17,11 @@ const sources = [
   // 论坛类
   { url: 'https://rsshub.app/zhihu/hot', name: '知乎热榜', type: 'forum' },
   { url: 'https://www.v2ex.com/feed/tab/hot.xml', name: 'V2EX热门', type: 'forum' },
+  // 赛事奖项类
+  { url: 'https://news.google.com/rss/search?q=雨果奖+银河奖+星云奖+科幻+奖项&hl=zh-CN&gl=CN&ceid=CN:zh-Hans', name: '科幻奖项新闻', type: 'article' },
+  { url: 'https://news.google.com/rss/search?q=Hugo+Award+Nebula+Award+Locus+science+fiction&hl=en-US&gl=US&ceid=US:en', name: 'Sci-Fi Awards', type: 'article' },
+  { url: 'https://news.google.com/rss/search?q=科幻+获奖作品+推荐+年度+最佳&hl=zh-CN&gl=CN&ceid=CN:zh-Hans', name: '科幻作品资讯', type: 'article' },
+  { url: 'https://news.google.com/rss/search?q=sci-fi+best+novel+award+winner+recommended&hl=en-US&gl=US&ceid=US:en', name: 'Sci-Fi Works', type: 'article' },
 ]
 
 const sciFiKeywords = [
@@ -34,6 +39,14 @@ const eventKeywords = [
   '大赛', '赛事', '颁奖', '获奖', '银河奖', '星云奖',
   '科幻大会', '征文', '竞赛', '论坛', '峰会',
   '展览', '嘉年华', '开幕', '闭幕', '启动',
+  '雨果奖', 'Hugo', 'Nebula', '轨迹奖', 'Locus',
+  '斯特金奖', '克拉克奖', '世界科幻大会',
+  'Worldcon', 'World Fantasy', 'Sturgeon',
+  '提名', '入围', '揭晓', '评选', '候选',
+  '终审', '复审', '初审', '参评',
+  '最佳长篇', '最佳短篇', '最佳系列',
+  '获奖作品', '年度最佳', '年度科幻',
+  '往届', '通告', '入选', '榜单',
 ]
 
 function isSciFiRelated(item) {
