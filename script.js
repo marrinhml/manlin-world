@@ -499,7 +499,6 @@ function attachCardEvents() {
       openDetailModal(el.dataset.id)
     })
   })
-})
 
   document.querySelectorAll('[data-action="commentLike"]').forEach(btn => {
     btn.addEventListener('click', (e) => {
