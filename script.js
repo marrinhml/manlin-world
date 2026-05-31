@@ -1330,6 +1330,11 @@ function handleRegister(e) {
 
   if (!account || !nickname || !password || !confirm) return
 
+  if (nickname.length > 15) {
+    showToast('注册失败：昵称不得超过 15 个字符', 'failure')
+    return
+  }
+
   if (password !== confirm) {
     showToast('注册失败：两次密码不一致', 'failure')
     return
@@ -1469,6 +1474,10 @@ function handleUpdateSettings(e) {
 
   const newNickname = document.getElementById('settingsNickname').value.trim()
   if (newNickname) {
+    if (newNickname.length > 15) {
+      showToast('昵称不得超过 15 个字符', 'failure')
+      return
+    }
     const nickExists = users.some((u, i) => i !== userIdx && u.nickname === newNickname)
     if (nickExists) { showToast('抱歉探测员，昵称已有人编写', 'failure'); return }
     users[userIdx].nickname = newNickname
