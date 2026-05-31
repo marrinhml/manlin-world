@@ -35,7 +35,7 @@ let currentUser = null
 let newsCache = null
 let newsFilter = 'all'
 let currentPage = 1
-const ITEMS_PER_PAGE = 20
+const ITEMS_PER_PAGE = 15
 const NEWS_CACHE_KEY = 'manlin_news'
 const NEWS_CACHE_TIME = 30 * 60 * 1000
 
@@ -896,6 +896,50 @@ async function fetchNews() {
   }
 }
 
+async function refreshNews() {
+  const grid = document.getElementById('newsGrid')
+  const countEl = document.getElementById('newsCount')
+  const paginationEl = document.getElementById('newsPagination')
+  paginationEl.innerHTML = ''
+  countEl.textContent = '刷新中…'
+  grid.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">⟡</div>
+      <p class="empty-text">正在刷新星际波段…</p>
+      <p class="empty-hint">请稍候，正在调谐各星系节点频率</p>
+    </div>`
+
+  try {
+    const res = await fetch('/.netlify/functions/news?_=' + Date.now())
+    if (!res.ok) throw new Error('信号中断')
+    const data = await res.json()
+
+    const existingLinks = new Set((newsCache || []).map(a => a.link).filter(Boolean))
+    const newItems = (data.articles || []).filter(a => a.link && !existingLinks.has(a.link))
+
+    if (newItems.length === 0) {
+      showToast('抱歉探测员，没有更新波段', 'failure')
+      if (newsCache) renderNews(newsCache)
+      document.getElementById('newsUpdateTime').textContent = '更新于 ' + formatDate(data.updatedAt)
+      return
+    }
+
+    newsCache = [...newItems, ...(newsCache || [])]
+    try {
+      localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify({ articles: newsCache, time: Date.now() }))
+    } catch (e) { /* ignore */ }
+
+    currentPage = 1
+    renderNews(newsCache)
+    document.getElementById('newsUpdateTime').textContent = '更新于 ' + formatDate(data.updatedAt)
+    showToast(`探测到 ${newItems.length} 条新波段信号 ✦`, 'success')
+  } catch (e) {
+    console.error('refreshNews error:', e)
+    showToast('星际信号不稳定，刷新失败', 'failure')
+    if (newsCache) renderNews(newsCache)
+  }
+}
+
 function renderNews(articles) {
   const grid = document.getElementById('newsGrid')
   const countEl = document.getElementById('newsCount')
@@ -1676,6 +1720,10 @@ function init() {
     newsFilter = btn.dataset.type
     currentPage = 1
     if (newsCache) renderNews(newsCache)
+  })
+
+  document.getElementById('btnRefreshNews').addEventListener('click', () => {
+    refreshNews()
   })
 
   try {
