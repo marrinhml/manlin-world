@@ -2156,6 +2156,57 @@ async function init() {
       }
     })
   })
+
+  if (!supabase) {
+    const checkTimer = setInterval(() => {
+      if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+        clearInterval(checkTimer)
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+        isSupabaseOnline = true
+        updateSupabaseStatus(true)
+        initSupabaseSession().then(() => {
+          loadIdeas().then(() => {
+            renderIdeas()
+            updateUserUI()
+          })
+        })
+      }
+    }, 2000)
+    setTimeout(() => clearInterval(checkTimer), 30000)
+  }
+}
+
+async function initSupabaseSession() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      currentUser = session.user.id
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', currentUser)
+        .single()
+      currentUserProfile = profile
+    }
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        currentUser = null
+        currentUserProfile = null
+        updateUserUI()
+        reloadIdeas()
+      } else if (event === 'SIGNED_IN' && session) {
+        currentUser = session.user.id
+        supabase.from('profiles').select('*').eq('id', currentUser).single().then(({ data }) => {
+          currentUserProfile = data
+          updateUserUI()
+          reloadIdeas()
+        })
+      }
+    })
+  } catch (e) {
+    isSupabaseOnline = false
+    updateSupabaseStatus(false)
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init)
