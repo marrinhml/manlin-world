@@ -2194,6 +2194,8 @@ body.reveal .content-section {
 .modal-card {
   width: 100%;
   max-width: 420px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
   background: var(--bg-elevated);
   border: 1px solid var(--border-glow);
   border-radius: var(--radius-lg);
@@ -2201,6 +2203,20 @@ body.reveal .content-section {
   box-shadow: 0 0 60px rgba(126, 200, 227, 0.06), var(--shadow-card);
   transform: translateY(20px) scale(0.96);
   transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  scrollbar-width: thin;
+}
+
+.modal-card::-webkit-scrollbar {
+  width: 4px;
+}
+
+.modal-card::-webkit-scrollbar-thumb {
+  background: var(--border-glow);
+  border-radius: 2px;
+}
+
+.modal-card::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .modal-overlay.active .modal-card {
@@ -2212,6 +2228,10 @@ body.reveal .content-section {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 24px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-elevated);
 }
 
 .modal-title {
