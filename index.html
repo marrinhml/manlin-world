@@ -151,6 +151,10 @@
             <span class="filter-dot essay-dot"></span>
             科幻随笔
           </button>
+          <button class="filter-btn filter-fav-btn" data-filter="favorites" id="filterFavBtn">
+            <span class="filter-dot fav-dot"></span>
+            ★ 收藏
+          </button>
           <span class="filter-separator"></span>
           <button class="filter-btn filter-news-btn" data-filter="news">
             <span class="filter-dot news-dot"></span>
@@ -424,8 +428,16 @@
             <span class="profile-stat-label">获赞</span>
           </div>
           <div class="profile-stat">
+            <span class="profile-stat-value" id="profileStatViews">0</span>
+            <span class="profile-stat-label">浏览</span>
+          </div>
+          <div class="profile-stat">
             <span class="profile-stat-value" id="profileStatComments">0</span>
             <span class="profile-stat-label">评论</span>
+          </div>
+          <div class="profile-stat">
+            <span class="profile-stat-value" id="profileStatFav">0</span>
+            <span class="profile-stat-label">收藏</span>
           </div>
         </div>
         <div class="profile-posts-section">

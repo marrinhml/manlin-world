@@ -190,6 +190,18 @@ function formatDate(isoStr) {
 function getDisplayIdeas() {
   let result = [...ideas]
 
+  if (currentFilter === 'favorites') {
+    if (!currentUser) return []
+    const users = getUsers()
+    const userData = users.find(u => u.account === currentUser)
+    if (userData && userData.favorites && userData.favorites.length > 0) {
+      result = result.filter(item => userData.favorites.includes(item.id))
+    } else {
+      return []
+    }
+    return result
+  }
+
   if (currentFilter !== 'all') {
     result = result.filter(item => item.category === currentFilter)
   }
@@ -278,6 +290,9 @@ function renderIdeas() {
     const commentCount = item.comments ? item.comments.length : 0
     const hotness = likeCount + commentCount
     const isLiked = isLoggedIn && item.likedBy && item.likedBy.includes(user)
+    const usersList = getUsers()
+    const curUserData = isLoggedIn ? usersList.find(u => u.account === user) : null
+    const isFavorited = isLoggedIn && curUserData && curUserData.favorites && curUserData.favorites.includes(item.id)
     const style = `animation-delay: ${index * 0.06}s`
     const authorAvatar = getUserAvatar(item.author)
 
@@ -364,6 +379,13 @@ function renderIdeas() {
             <span class="action-icon">◎</span>
             <span class="card-view-count">${item.views || 0}</span>
           </span>
+          ${isLoggedIn ? `
+          <button class="card-action-btn ${isFavorited ? 'favorited' : ''}" data-action="favorite" data-id="${item.id}">
+            <span class="action-icon">${isFavorited ? '★' : '☆'}</span>
+          </button>` : ''}
+          <button class="card-action-btn" data-action="share" data-id="${item.id}">
+            <span class="action-icon">↗</span>
+          </button>
           <span class="card-actions-divider"></span>
           <button class="card-action-btn action-edit" data-action="edit" data-id="${item.id}">
             <span class="action-icon">✎</span>
@@ -446,6 +468,20 @@ function attachCardEvents() {
       e.stopPropagation()
       const author = el.dataset.author
       if (author) viewUserInfo(author)
+    })
+  })
+
+  document.querySelectorAll('[data-action="favorite"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      handleFavorite(btn.dataset.id)
+    })
+  })
+
+  document.querySelectorAll('[data-action="share"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      handleShare(btn.dataset.id)
     })
   })
 
@@ -710,6 +746,56 @@ function handleSubmitReply(ideaId, commentId) {
     el.classList.add('open')
   }
   renderIdeas()
+}
+
+function handleFavorite(id) {
+  if (!currentUser) {
+    showToast('请先登录后收藏', 'failure')
+    return
+  }
+  const users = getUsers()
+  const userData = users.find(u => u.account === currentUser)
+  if (!userData) return
+  if (!userData.favorites) userData.favorites = []
+  const idx = userData.favorites.indexOf(id)
+  if (idx > -1) {
+    userData.favorites.splice(idx, 1)
+    showToast('已取消收藏', 'failure')
+  } else {
+    userData.favorites.push(id)
+    showToast('已收藏', 'success')
+  }
+  saveUsers(users)
+  renderIdeas()
+}
+
+function handleShare(id) {
+  const url = `${window.location.origin}${window.location.pathname}?idea=${id}`
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('链接已复制，可以分享给其他探测员', 'success')
+    }).catch(() => {
+      fallbackCopy(url)
+    })
+  } else {
+    fallbackCopy(url)
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea')
+  ta.value = text
+  ta.style.position = 'fixed'
+  ta.style.left = '-9999px'
+  document.body.appendChild(ta)
+  ta.select()
+  try {
+    document.execCommand('copy')
+    showToast('链接已复制，可以分享给其他探测员', 'success')
+  } catch (e) {
+    showToast('复制失败，请手动复制链接', 'failure')
+  }
+  document.body.removeChild(ta)
 }
 
 function setFilter(filter) {
@@ -1054,6 +1140,7 @@ function updateUserUI() {
   const logged = document.getElementById('userLogged')
   const nameEl = document.getElementById('userNameDisplay')
   const avatarEl = document.getElementById('userAvatar')
+  const favBtn = document.getElementById('filterFavBtn')
 
   if (currentUser) {
     guest.style.display = 'none'
@@ -1061,9 +1148,11 @@ function updateUserUI() {
     nameEl.textContent = getUserNickname(currentUser)
     const avatar = getUserAvatar(currentUser)
     avatarEl.innerHTML = avatar ? `<img class="avatar-img" src="${avatar}" alt="">` : '✦'
+    if (favBtn) favBtn.style.display = ''
   } else {
     guest.style.display = 'flex'
     logged.style.display = 'none'
+    if (favBtn) favBtn.style.display = 'none'
   }
 }
 
@@ -1122,7 +1211,7 @@ function handleRegister(e) {
     return
   }
 
-  users.push({ id: generateId(), account, nickname, password, avatar: generateRandomAvatar(nickname), createdAt: new Date().toISOString() })
+  users.push({ id: generateId(), account, nickname, password, avatar: generateRandomAvatar(nickname), createdAt: new Date().toISOString(), favorites: [] })
   saveUsers(users)
   showToast('注册成功', 'success')
   closeModal('registerModal')
@@ -1167,9 +1256,11 @@ function openProfile() {
 
   const userIdeas = ideas.filter(item => item.author === currentUser)
   const totalLikes = userIdeas.reduce((sum, item) => sum + (item.likes || 0), 0)
+  const totalViews = userIdeas.reduce((sum, item) => sum + (item.views || 0), 0)
   const totalComments = userIdeas.reduce((sum, item) => sum + (item.comments ? item.comments.length : 0), 0)
   const users = getUsers()
   const userData = users.find(u => u.account === currentUser)
+  const favCount = userData && userData.favorites ? userData.favorites.length : 0
 
   document.getElementById('profileAccount').textContent = getUserNickname(currentUser)
   document.getElementById('profileJoinDate').textContent = userData
@@ -1185,7 +1276,9 @@ function openProfile() {
 
   document.getElementById('profileStatPosts').textContent = userIdeas.length
   document.getElementById('profileStatLikes').textContent = totalLikes
+  document.getElementById('profileStatViews').textContent = totalViews
   document.getElementById('profileStatComments').textContent = totalComments
+  document.getElementById('profileStatFav').textContent = favCount
 
   const listEl = document.getElementById('profilePostsList')
   const countEl = document.getElementById('profilePostsCount')

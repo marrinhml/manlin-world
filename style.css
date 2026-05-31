@@ -3038,3 +3038,24 @@ body.reveal .content-section {
   color: #ef4444;
   text-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
 }
+
+.card-action-btn.favorited {
+  color: #fbbf24;
+}
+
+.card-action-btn.favorited:hover {
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.filter-fav-btn {
+  color: var(--text-dim);
+}
+
+.filter-fav-btn.active {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.06);
+}
+
+.fav-dot {
+  background: #fbbf24;
+}
