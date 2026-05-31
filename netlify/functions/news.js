@@ -91,7 +91,7 @@ exports.handler = async (event, context) => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      articles: allItems.slice(0, 60),
+      articles: allItems.slice(0, 200),
       updatedAt: new Date().toISOString(),
       total: allItems.length,
     }),

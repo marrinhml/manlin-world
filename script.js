@@ -34,6 +34,8 @@ let ideas = []
 let currentUser = null
 let newsCache = null
 let newsFilter = 'all'
+let currentPage = 1
+const ITEMS_PER_PAGE = 20
 const NEWS_CACHE_KEY = 'manlin_news'
 const NEWS_CACHE_TIME = 30 * 60 * 1000
 
@@ -839,7 +841,7 @@ function setSort(sort) {
   renderIdeas()
 }
 
-async function fetchNews(forceRefresh) {
+async function fetchNews() {
   const grid = document.getElementById('newsGrid')
   const countEl = document.getElementById('newsCount')
   countEl.textContent = '接收中…'
@@ -851,57 +853,18 @@ async function fetchNews(forceRefresh) {
     </div>`
 
   try {
-    let url = '/.netlify/functions/news'
-    if (forceRefresh) {
-      url += '?_=' + Date.now()
-    }
-    const res = await fetch(url)
+    const res = await fetch('/.netlify/functions/news')
     if (!res.ok) throw new Error('信号中断')
     const data = await res.json()
 
-    const seenKey = 'manlin_news_seen'
-    let seenLinks = []
+    newsCache = data.articles || []
     try {
-      const raw = localStorage.getItem(seenKey)
-      if (raw) seenLinks = JSON.parse(raw)
+      localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify({ articles: newsCache, time: Date.now() }))
     } catch (e) { /* ignore */ }
 
-    let displayArticles
-
-    if (forceRefresh) {
-      const unseen = data.articles.filter(a => {
-        if (!a.link) return true
-        return !seenLinks.includes(a.link)
-      })
-
-      if (unseen.length === 0) {
-        showToast('抱歉探测员，外界频率内容并未更新，请稍等一段时间', 'failure')
-        if (newsCache && newsCache.length > 0) {
-          renderNews(newsCache)
-          document.getElementById('newsUpdateTime').textContent = '最后更新 ' + formatDate(data.updatedAt)
-        } else {
-          displayArticles = data.articles.slice(0, 20)
-        }
-        if (!displayArticles) return
-      } else {
-        displayArticles = unseen.slice(0, 20)
-      }
-    } else {
-      displayArticles = data.articles.slice(0, 20)
-    }
-
-    const newSeen = [...seenLinks, ...displayArticles.map(a => a.link).filter(Boolean)]
-    try {
-      localStorage.setItem(seenKey, JSON.stringify(newSeen.slice(-500)))
-    } catch (e) { /* ignore */ }
-
-    newsCache = displayArticles
-    try {
-      localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify({ articles: displayArticles, time: Date.now() }))
-    } catch (e) { /* ignore */ }
-
-    renderNews(displayArticles)
-    document.getElementById('newsUpdateTime').textContent = '最后更新 ' + formatDate(data.updatedAt)
+    currentPage = 1
+    renderNews(newsCache)
+    document.getElementById('newsUpdateTime').textContent = '更新于 ' + formatDate(data.updatedAt)
   } catch (e) {
     console.error('fetchNews error:', e)
     let fallback = null
@@ -936,6 +899,7 @@ async function fetchNews(forceRefresh) {
 function renderNews(articles) {
   const grid = document.getElementById('newsGrid')
   const countEl = document.getElementById('newsCount')
+  const paginationEl = document.getElementById('newsPagination')
 
   if (!articles || articles.length === 0) {
     grid.innerHTML = `
@@ -945,6 +909,7 @@ function renderNews(articles) {
         <p class="empty-hint">资讯节点尚未返回数据</p>
       </div>`
     countEl.textContent = '0 条信号'
+    paginationEl.innerHTML = ''
     return
   }
 
@@ -960,11 +925,19 @@ function renderNews(articles) {
         <p class="empty-hint">试试切换其他分类标签</p>
       </div>`
     countEl.textContent = `${articles.length} 条信号`
+    paginationEl.innerHTML = ''
     return
   }
 
-  countEl.textContent = `${filtered.length} 条信号`
-  grid.innerHTML = filtered.map(item => {
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+  if (currentPage > totalPages) currentPage = totalPages
+  if (currentPage < 1) currentPage = 1
+
+  const start = (currentPage - 1) * ITEMS_PER_PAGE
+  const pageItems = filtered.slice(start, start + ITEMS_PER_PAGE)
+
+  countEl.textContent = `${filtered.length} 条信号 · 第 ${currentPage}/${totalPages} 页`
+  grid.innerHTML = pageItems.map(item => {
     const title = item.title.replace(/</g, '&lt;').replace(/>/g, '&gt;')
     const desc = item.description ? item.description.replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''
     const date = item.pubDate ? formatNewsDate(item.pubDate) : ''
@@ -992,6 +965,65 @@ function renderNews(articles) {
         <div class="news-card-footer">${typeBadge}</div>
       </a>`
   }).join('')
+
+  renderPagination(totalPages, paginationEl)
+}
+
+function renderPagination(totalPages, container) {
+  if (totalPages <= 1) {
+    container.innerHTML = ''
+    return
+  }
+
+  let html = '<div class="pagination-inner">'
+
+  if (currentPage > 1) {
+    html += `<button class="page-btn page-prev" data-page="${currentPage - 1}">‹</button>`
+  }
+
+  const maxVisible = 7
+  let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2))
+  let endPage = startPage + maxVisible - 1
+  if (endPage > totalPages) {
+    endPage = totalPages
+    startPage = Math.max(1, endPage - maxVisible + 1)
+  }
+
+  if (startPage > 1) {
+    html += `<button class="page-btn" data-page="1">1</button>`
+    if (startPage > 2) {
+      html += `<span class="page-ellipsis">…</span>`
+    }
+  }
+
+  for (let i = startPage; i <= endPage; i++) {
+    html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`
+  }
+
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) {
+      html += `<span class="page-ellipsis">…</span>`
+    }
+    html += `<button class="page-btn" data-page="${totalPages}">${totalPages}</button>`
+  }
+
+  if (currentPage < totalPages) {
+    html += `<button class="page-btn page-next" data-page="${currentPage + 1}">›</button>`
+  }
+
+  html += '</div>'
+  container.innerHTML = html
+
+  container.querySelectorAll('.page-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const page = parseInt(btn.dataset.page)
+      if (page && page !== currentPage) {
+        currentPage = page
+        renderNews(newsCache)
+        document.querySelector('.news-section').scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    })
+  })
 }
 
 function updateTagFilterBar() {
@@ -1636,17 +1668,13 @@ function init() {
     btn.addEventListener('click', () => setFilter(btn.dataset.filter))
   })
 
-  document.getElementById('btnRefreshNews').addEventListener('click', () => {
-    newsCache = null
-    fetchNews(true)
-  })
-
   document.getElementById('newsFilterBar').addEventListener('click', (e) => {
     const btn = e.target.closest('.news-filter-btn')
     if (!btn) return
     document.querySelectorAll('.news-filter-btn').forEach(b => b.classList.remove('active'))
     btn.classList.add('active')
     newsFilter = btn.dataset.type
+    currentPage = 1
     if (newsCache) renderNews(newsCache)
   })
 
