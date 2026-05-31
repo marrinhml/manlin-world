@@ -5,7 +5,14 @@ const NEWS_CACHE_TIME = 30 * 60 * 1000
 const SUPABASE_URL = 'https://dilpctjvgsyeifqqhrvj.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpbHBjdGp2Z3N5ZWlmcXFocnZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMzc0NDksImV4cCI6MjA5NTgxMzQ0OX0.hCgveTOnErouZMFNQtQxyXBByMpwa6-9inLYTNm692Y'
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+let supabase = null
+try {
+  if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  }
+} catch (e) {
+  console.error('Supabase SDK init error:', e)
+}
 
 const categoryNames = {
   idea: '科幻点子',
