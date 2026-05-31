@@ -580,6 +580,12 @@ body {
   margin-bottom: 8px;
   line-height: 1.4;
   letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: color var(--transition);
+}
+
+.idea-card .card-title:hover {
+  color: var(--gold);
 }
 
 .idea-card .card-content {
@@ -955,21 +961,29 @@ body {
   max-width: 680px;
   max-height: calc(100vh - 60px);
   padding: 24px 32px;
+  overflow: hidden;
 }
 
 .detail-body {
   overflow-y: auto;
-  max-height: calc(100vh - 140px);
+  max-height: calc(100vh - 175px);
   scrollbar-width: thin;
+  padding-right: 4px;
 }
 
 .detail-body::-webkit-scrollbar {
-  width: 4px;
+  width: 5px;
 }
 
 .detail-body::-webkit-scrollbar-thumb {
-  background: var(--border-glow);
-  border-radius: 2px;
+  background: linear-gradient(180deg, var(--gold), rgba(201, 168, 76, 0.3));
+  border-radius: 3px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.detail-body::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .detail-idea-title {
@@ -2405,15 +2419,18 @@ body.reveal .content-section {
   transform: translateY(20px) scale(0.96);
   transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   scrollbar-width: thin;
+  scrollbar-color: var(--gold) transparent;
 }
 
 .modal-card::-webkit-scrollbar {
-  width: 4px;
+  width: 5px;
 }
 
 .modal-card::-webkit-scrollbar-thumb {
-  background: var(--border-glow);
-  border-radius: 2px;
+  background: linear-gradient(180deg, var(--gold), rgba(201, 168, 76, 0.3));
+  border-radius: 3px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
 }
 
 .modal-card::-webkit-scrollbar-track {

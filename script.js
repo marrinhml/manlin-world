@@ -365,7 +365,7 @@ function renderIdeas() {
     return `
       <article class="idea-card" data-id="${item.id}" style="${style}">
         <span class="card-tag ${tagClass}">${catName}</span>
-        <h3 class="card-title">${escapedTitle}</h3>
+        <h3 class="card-title" data-action="view" data-id="${item.id}">${escapedTitle}</h3>
         ${tagsHtml}
         <div class="markdown-content">${renderedContent}</div>
         <div class="card-expand" data-action="view" data-id="${item.id}">展开全文 ▸</div>
