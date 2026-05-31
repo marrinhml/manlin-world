@@ -1009,7 +1009,9 @@ function renderNews(articles) {
 
   const filtered = newsFilter === 'all'
     ? articles
-    : articles.filter(item => (item.type || 'article') === newsFilter)
+    : newsFilter === 'digest'
+      ? articles.filter(item => item.type === 'article' || item.type === 'forum')
+      : articles.filter(item => (item.type || 'article') === newsFilter)
 
   if (filtered.length === 0) {
     grid.innerHTML = `
