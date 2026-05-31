@@ -38,7 +38,6 @@ let currentPage = 1
 const ITEMS_PER_PAGE = 15
 const NEWS_CACHE_KEY = 'manlin_news'
 const NEWS_CACHE_TIME = 30 * 60 * 1000
-const ABOUT_SHOWN_KEY = 'manlin_about_shown'
 
 function formatNewsDate(dateStr) {
   if (!dateStr) return ''
@@ -1743,12 +1742,9 @@ function handleSplashEnter() {
         setTimeout(() => {
           splash.style.display = 'none'
           document.body.classList.add('reveal')
-          if (!localStorage.getItem(ABOUT_SHOWN_KEY)) {
-            setTimeout(() => {
-              openAbout()
-              localStorage.setItem(ABOUT_SHOWN_KEY, '1')
-            }, 500)
-          }
+          setTimeout(() => {
+            openAbout()
+          }, 500)
         }, 1100)
       }, 400)
       return
