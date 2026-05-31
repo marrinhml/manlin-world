@@ -33,6 +33,7 @@ let deletingId = null
 let ideas = []
 let currentUser = null
 let newsCache = null
+let newsFilter = 'all'
 const NEWS_CACHE_KEY = 'manlin_news'
 const NEWS_CACHE_TIME = 30 * 60 * 1000
 
@@ -947,20 +948,48 @@ function renderNews(articles) {
     return
   }
 
-  countEl.textContent = `${articles.length} 条信号`
-  grid.innerHTML = articles.map(item => {
+  const filtered = newsFilter === 'all'
+    ? articles
+    : articles.filter(item => (item.type || 'article') === newsFilter)
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">⟡</div>
+        <p class="empty-text">该分类下暂无信号</p>
+        <p class="empty-hint">试试切换其他分类标签</p>
+      </div>`
+    countEl.textContent = `${articles.length} 条信号`
+    return
+  }
+
+  countEl.textContent = `${filtered.length} 条信号`
+  grid.innerHTML = filtered.map(item => {
     const title = item.title.replace(/</g, '&lt;').replace(/>/g, '&gt;')
     const desc = item.description ? item.description.replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''
     const date = item.pubDate ? formatNewsDate(item.pubDate) : ''
     const source = item.source ? item.source.replace(/</g, '&lt;') : ''
+    const type = item.type || 'article'
+
+    const typeBadge = {
+      article: '<span class="news-type-badge type-article">📄 文章</span>',
+      video: '<span class="news-type-badge type-video">🎬 视频</span>',
+      forum: '<span class="news-type-badge type-forum">💬 论坛</span>',
+      event: '<span class="news-type-badge type-event">🏆 赛事</span>',
+    }[type] || ''
+
+    const cardClass = `news-card news-card-${type}`
+
     return `
-      <a class="news-card" href="${item.link}" target="_blank" rel="noopener noreferrer">
+      <a class="${cardClass}" href="${item.link}" target="_blank" rel="noopener noreferrer">
         <div class="news-card-top">
           <span class="news-source">${source}</span>
           ${date ? `<span class="news-date">${date}</span>` : ''}
         </div>
+        ${type === 'video' ? '<div class="news-card-video-overlay"><span class="news-play-icon">▶</span></div>' : ''}
         <div class="news-card-title">${title}</div>
         ${desc ? `<div class="news-card-desc">${desc}</div>` : ''}
+        <div class="news-card-footer">${typeBadge}</div>
       </a>`
   }).join('')
 }
@@ -1610,6 +1639,15 @@ function init() {
   document.getElementById('btnRefreshNews').addEventListener('click', () => {
     newsCache = null
     fetchNews(true)
+  })
+
+  document.getElementById('newsFilterBar').addEventListener('click', (e) => {
+    const btn = e.target.closest('.news-filter-btn')
+    if (!btn) return
+    document.querySelectorAll('.news-filter-btn').forEach(b => b.classList.remove('active'))
+    btn.classList.add('active')
+    newsFilter = btn.dataset.type
+    if (newsCache) renderNews(newsCache)
   })
 
   try {

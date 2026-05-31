@@ -1,15 +1,22 @@
 const Parser = require('rss-parser')
 
 const sources = [
-  { url: 'https://www.gcores.com/rss', name: '机核网' },
-  { url: 'http://www.yystv.cn/rss/feed', name: '游研社' },
-  { url: 'https://www.guokr.com/handpick/rss/', name: '果壳网' },
-  { url: 'https://www.solidot.org/index.rss', name: 'Solidot' },
-  { url: 'https://sspai.com/feed', name: '少数派' },
-  { url: 'https://www.huxiu.com/rss/0.xml', name: '虎嗅网' },
-  { url: 'https://www.ifanr.com/feed', name: '爱范儿' },
-  { url: 'https://www.geekpark.net/rss', name: '极客公园' },
-  { url: 'https://rsshub.app/bilibili/popular/weekly', name: 'B站每周必看' },
+  // 文章类
+  { url: 'https://www.gcores.com/rss', name: '机核网', type: 'article' },
+  { url: 'http://www.yystv.cn/rss/feed', name: '游研社', type: 'article' },
+  { url: 'https://www.guokr.com/handpick/rss/', name: '果壳网', type: 'article' },
+  { url: 'https://www.solidot.org/index.rss', name: 'Solidot', type: 'article' },
+  { url: 'https://sspai.com/feed', name: '少数派', type: 'article' },
+  { url: 'https://www.huxiu.com/rss/0.xml', name: '虎嗅网', type: 'article' },
+  { url: 'https://www.ifanr.com/feed', name: '爱范儿', type: 'article' },
+  { url: 'https://www.geekpark.net/rss', name: '极客公园', type: 'article' },
+  // 视频类
+  { url: 'https://rsshub.app/bilibili/popular/weekly', name: 'B站每周必看', type: 'video' },
+  { url: 'https://rsshub.app/bilibili/vsearch/%E7%A7%91%E5%B9%BB', name: 'B站科幻视频', type: 'video' },
+  { url: 'https://rsshub.app/bilibili/partion/ranking/201/7', name: 'B站科学科普', type: 'video' },
+  // 论坛类
+  { url: 'https://rsshub.app/zhihu/hot', name: '知乎热榜', type: 'forum' },
+  { url: 'https://www.v2ex.com/feed/tab/hot.xml', name: 'V2EX热门', type: 'forum' },
 ]
 
 const sciFiKeywords = [
@@ -23,9 +30,20 @@ const sciFiKeywords = [
   '游戏', '影视', '电影', '动画', '漫画',
 ]
 
+const eventKeywords = [
+  '大赛', '赛事', '颁奖', '获奖', '银河奖', '星云奖',
+  '科幻大会', '征文', '竞赛', '论坛', '峰会',
+  '展览', '嘉年华', '开幕', '闭幕', '启动',
+]
+
 function isSciFiRelated(item) {
   const text = `${item.title || ''} ${item.categories ? item.categories.join(' ') : ''} ${item.contentSnippet ? item.contentSnippet.slice(0, 100) : ''}`.toLowerCase()
   return sciFiKeywords.some(kw => text.includes(kw.toLowerCase()))
+}
+
+function isEventRelated(item) {
+  const text = `${item.title || ''} ${item.contentSnippet ? item.contentSnippet.slice(0, 150) : ''}`.toLowerCase()
+  return eventKeywords.some(kw => text.includes(kw.toLowerCase()))
 }
 
 exports.handler = async (event, context) => {
@@ -36,13 +54,20 @@ exports.handler = async (event, context) => {
 
   const results = await Promise.allSettled(sources.map(source =>
     parser.parseURL(source.url).then(feed => {
-      const items = feed.items.filter(isSciFiRelated).slice(0, 25).map(item => ({
-        title: item.title || '(无标题)',
-        link: item.link || '',
-        description: item.contentSnippet ? item.contentSnippet.replace(/\s+/g, ' ').trim().slice(0, 200) : '',
-        pubDate: item.pubDate || item.isoDate || '',
-        source: source.name,
-      }))
+      const items = feed.items.filter(isSciFiRelated).slice(0, 25).map(item => {
+        let type = source.type
+        if (isEventRelated(item)) {
+          type = 'event'
+        }
+        return {
+          title: item.title || '(无标题)',
+          link: item.link || '',
+          description: item.contentSnippet ? item.contentSnippet.replace(/\s+/g, ' ').trim().slice(0, 200) : '',
+          pubDate: item.pubDate || item.isoDate || '',
+          source: source.name,
+          type: type,
+        }
+      })
       return items
     }).catch(e => {
       console.error(`[news] fetch ${source.name} failed:`, e.message)
@@ -66,7 +91,7 @@ exports.handler = async (event, context) => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      articles: allItems.slice(0, 50),
+      articles: allItems.slice(0, 60),
       updatedAt: new Date().toISOString(),
       total: allItems.length,
     }),
