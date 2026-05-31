@@ -5,10 +5,10 @@ const NEWS_CACHE_TIME = 30 * 60 * 1000
 const SUPABASE_URL = 'https://dilpctjvgsyeifqqhrvj.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpbHBjdGp2Z3N5ZWlmcXFocnZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMzc0NDksImV4cCI6MjA5NTgxMzQ0OX0.hCgveTOnErouZMFNQtQxyXBByMpwa6-9inLYTNm692Y'
 
-let supabase = null
+let sb = null
 try {
   if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   }
 } catch (e) {
   console.error('Supabase SDK init error:', e)
@@ -104,7 +104,7 @@ function generateRandomNickname() {
 }
 
 async function checkNicknameExists(nickname) {
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('profiles')
     .select('id')
     .eq('nickname', nickname)
@@ -114,7 +114,7 @@ async function checkNicknameExists(nickname) {
 }
 
 async function loadIdeas() {
-  const { data: ideasData, error } = await supabase
+  const { data: ideasData, error } = await sb
     .from('ideas')
     .select('*')
     .order('created_at', { ascending: false })
@@ -127,7 +127,7 @@ async function loadIdeas() {
 
   const ideaIds = ideasData.map(i => i.id)
 
-  const { data: commentsData } = await supabase
+  const { data: commentsData } = await sb
     .from('comments')
     .select('*')
     .in('idea_id', ideaIds)
@@ -135,7 +135,7 @@ async function loadIdeas() {
 
   const commentIds = (commentsData || []).map(c => c.id)
 
-  const { data: repliesData } = await supabase
+  const { data: repliesData } = await sb
     .from('replies')
     .select('*')
     .in('comment_id', commentIds)
@@ -160,7 +160,7 @@ async function loadIdeas() {
 
   let profilesMap = {}
   if (userIds.size > 0) {
-    const { data: profilesData } = await supabase
+    const { data: profilesData } = await sb
       .from('profiles')
       .select('*')
       .in('id', Array.from(userIds))
@@ -583,7 +583,7 @@ async function handleLike(id) {
     newLikes = (idea.likes || 0) + 1
   }
 
-  await supabase
+  await sb
     .from('ideas')
     .update({ likes: newLikes, liked_by: newLikedBy })
     .eq('id', id)
@@ -610,7 +610,7 @@ async function toggleComments(id) {
     const idea = ideas.find(item => item.id === id)
     if (idea) {
       const newViews = (idea.views || 0) + 1
-      await supabase
+      await sb
         .from('ideas')
         .update({ views: newViews })
         .eq('id', id)
@@ -694,7 +694,7 @@ async function handleSubmitComment(id) {
   const text = input.value.trim()
   if (!text) return
 
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('comments')
     .insert({ idea_id: id, author_id: currentUser, text })
     .select()
@@ -751,7 +751,7 @@ async function handleCommentLike(ideaId, commentId) {
     newLikedBy.push(currentUser)
     newLikes = (comment.likes || 0) + 1
   }
-  await supabase
+  await sb
     .from('comments')
     .update({ likes: newLikes, liked_by: newLikedBy })
     .eq('id', commentId)
@@ -791,7 +791,7 @@ async function handleReplyLike(ideaId, commentId, replyId) {
     newLikedBy.push(currentUser)
     newLikes = (reply.likes || 0) + 1
   }
-  await supabase
+  await sb
     .from('replies')
     .update({ likes: newLikes, liked_by: newLikedBy })
     .eq('id', replyId)
@@ -837,7 +837,7 @@ async function handleSubmitReply(ideaId, commentId) {
   if (!comment) return
   if (!comment.replies) comment.replies = []
 
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('replies')
     .insert({ comment_id: commentId, author_id: currentUser, text })
     .select()
@@ -879,14 +879,14 @@ async function handleFavorite(id) {
   const idx = currentUserProfile.favorites.indexOf(id)
   if (idx > -1) {
     currentUserProfile.favorites.splice(idx, 1)
-    await supabase
+    await sb
       .from('profiles')
       .update({ favorites: currentUserProfile.favorites })
       .eq('id', currentUser)
     showToast('已取消收藏', 'failure')
   } else {
     currentUserProfile.favorites.push(id)
-    await supabase
+    await sb
       .from('profiles')
       .update({ favorites: currentUserProfile.favorites })
       .eq('id', currentUser)
@@ -1251,7 +1251,7 @@ async function handlePublish(e) {
     ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean)
     : []
 
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('ideas')
     .insert({
       title,
@@ -1316,7 +1316,7 @@ async function handleEditSubmit(e) {
   const idea = ideas.find(item => item.id === editingId)
   if (!idea) return
 
-  await supabase
+  await sb
     .from('ideas')
     .update({ title, content, category, tags, updated_at: new Date().toISOString() })
     .eq('id', editingId)
@@ -1400,7 +1400,7 @@ async function confirmDelete() {
     return
   }
 
-  await supabase
+  await sb
     .from('ideas')
     .delete()
     .eq('id', deletingId)
@@ -1496,7 +1496,7 @@ async function handleRegister(e) {
     return
   }
 
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await sbauth.signUp({
     email,
     password,
     options: {
@@ -1524,7 +1524,7 @@ async function handleLogin(e) {
   const password = document.getElementById('loginPassword').value
   if (!email || !password) return
 
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await sbauth.signInWithPassword({
     email,
     password
   })
@@ -1535,7 +1535,7 @@ async function handleLogin(e) {
   }
 
   currentUser = data.user.id
-  const { data: profile } = await supabase
+  const { data: profile } = await sb
     .from('profiles')
     .select('*')
     .eq('id', currentUser)
@@ -1551,7 +1551,7 @@ async function handleLogin(e) {
 }
 
 async function handleLogout() {
-  await supabase.auth.signOut()
+  await sbauth.signOut()
   currentUser = null
   currentUserProfile = null
   updateUserUI()
@@ -1644,15 +1644,15 @@ async function handleUpdateSettings(e) {
   const confirmPwd = document.getElementById('settingsConfirmPwd').value
 
   if (currPwd || newPwd || confirmPwd) {
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: (await supabase.auth.getUser()).data.user.email,
+    const { error: signInError } = await sbauth.signInWithPassword({
+      email: (await sbauth.getUser()).data.user.email,
       password: currPwd
     })
     if (signInError) { showToast('当前密码错误', 'failure'); return }
     if (newPwd && newPwd.length < 6) { showToast('新密码至少 6 位', 'failure'); return }
     if (newPwd !== confirmPwd) { showToast('两次新密码不一致', 'failure'); return }
     if (newPwd) {
-      const { error: updateError } = await supabase.auth.updateUser({ password: newPwd })
+      const { error: updateError } = await sbauth.updateUser({ password: newPwd })
       if (updateError) { showToast('密码修改失败', 'failure'); return }
     }
   }
@@ -1664,7 +1664,7 @@ async function handleUpdateSettings(e) {
     currentUserProfile.avatar = avatarSrc
   }
 
-  await supabase
+  await sb
     .from('profiles')
     .update({
       nickname: currentUserProfile.nickname,
@@ -1885,7 +1885,7 @@ function getUserAvatar(userId) {
 async function viewUserInfo(userId) {
   if (!userId) return
 
-  const { data: userProfile } = await supabase
+  const { data: userProfile } = await sb
     .from('profiles')
     .select('*')
     .eq('id', userId)
@@ -1948,10 +1948,10 @@ async function init() {
   initNetStatus()
 
   try {
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { session } } = await sbauth.getSession()
     if (session) {
       currentUser = session.user.id
-      const { data: profile } = await supabase
+      const { data: profile } = await sb
         .from('profiles')
         .select('*')
         .eq('id', currentUser)
@@ -1978,7 +1978,7 @@ async function init() {
   renderIdeas()
 
   try {
-    supabase.auth.onAuthStateChange((event, session) => {
+    sbauth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         currentUser = null
         currentUserProfile = null
@@ -1986,7 +1986,7 @@ async function init() {
         reloadIdeas()
       } else if (event === 'SIGNED_IN' && session) {
         currentUser = session.user.id
-        supabase.from('profiles').select('*').eq('id', currentUser).single().then(({ data }) => {
+        sbfrom('profiles').select('*').eq('id', currentUser).single().then(({ data }) => {
           currentUserProfile = data
           updateUserUI()
           reloadIdeas()
@@ -2157,11 +2157,11 @@ async function init() {
     })
   })
 
-  if (!supabase) {
+  if (!sb) {
     const checkTimer = setInterval(() => {
       if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
         clearInterval(checkTimer)
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+        sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
         isSupabaseOnline = true
         updateSupabaseStatus(true)
         initSupabaseSession().then(() => {
@@ -2178,17 +2178,17 @@ async function init() {
 
 async function initSupabaseSession() {
   try {
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { session } } = await sbauth.getSession()
     if (session) {
       currentUser = session.user.id
-      const { data: profile } = await supabase
+      const { data: profile } = await sb
         .from('profiles')
         .select('*')
         .eq('id', currentUser)
         .single()
       currentUserProfile = profile
     }
-    supabase.auth.onAuthStateChange((event, session) => {
+    sbauth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         currentUser = null
         currentUserProfile = null
@@ -2196,7 +2196,7 @@ async function initSupabaseSession() {
         reloadIdeas()
       } else if (event === 'SIGNED_IN' && session) {
         currentUser = session.user.id
-        supabase.from('profiles').select('*').eq('id', currentUser).single().then(({ data }) => {
+        sbfrom('profiles').select('*').eq('id', currentUser).single().then(({ data }) => {
           currentUserProfile = data
           updateUserUI()
           reloadIdeas()
