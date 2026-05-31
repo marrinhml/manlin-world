@@ -3059,3 +3059,39 @@ body.reveal .content-section {
 .fav-dot {
   background: #fbbf24;
 }
+
+.editor-div {
+  min-height: 120px;
+  resize: vertical;
+  overflow-y: auto;
+  cursor: text;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.8;
+}
+
+.editor-div:focus {
+  border-color: var(--blue-nebula);
+  box-shadow: 0 0 20px rgba(126, 200, 227, 0.08);
+}
+
+.editor-div:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-dim);
+  pointer-events: none;
+  white-space: pre-line;
+}
+
+.editor-div img {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: var(--radius-sm);
+  display: block;
+  margin: 8px 0;
+  object-fit: contain;
+  background: rgba(0,0,0,0.02);
+}
+
+[data-theme="light"] .editor-div img {
+  background: rgba(0,0,0,0.01);
+}

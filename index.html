@@ -93,7 +93,7 @@
               <input type="text" id="ideaTitle" class="form-input" placeholder="给你的灵感取个名字…" maxlength="100" required>
             </div>
             <div class="form-group">
-              <textarea id="ideaContent" class="form-textarea" placeholder="写下你的科幻想法… 支持 Markdown 格式&#10;图片: 点击下方 📷 按钮上传" rows="6" required></textarea>
+              <div id="ideaContent" class="form-textarea editor-div" contenteditable="true" data-placeholder="写下你的科幻想法…&#10;支持 Markdown 格式&#10;图片: 点击下方 📷 按钮上传"></div>
             </div>
             <div class="form-row form-tools">
               <div class="form-tools-left">
@@ -297,7 +297,15 @@
         </div>
         <div class="form-group">
           <label class="form-label">正文</label>
-          <textarea id="editContent" class="form-textarea modal-input" rows="6" required></textarea>
+          <div id="editContent" class="form-textarea editor-div" contenteditable="true" data-placeholder="编辑内容…" style="min-height:120px"></div>
+          <div class="form-row form-tools" style="margin-top:6px">
+            <div class="form-tools-left"></div>
+            <div class="form-tools-right">
+              <button type="button" class="btn btn-upload-img" id="btnUploadImageEdit" title="上传图片">
+                <span class="btn-icon">📷</span> 图片
+              </button>
+            </div>
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">标签（用逗号分隔）</label>

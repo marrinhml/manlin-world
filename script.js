@@ -115,6 +115,10 @@ function migrateIdea(idea) {
   return idea
 }
 
+function isHtmlContent(str) {
+  return /<img[\s/>]/.test(str) || /^<(div|p|h[1-6]|span|a|b|i|u|em|strong)[\s>]/i.test(str)
+}
+
 function generateRandomNickname() {
   const used = getUsers().map(u => u.nickname).filter(Boolean)
   const available = randomNicknames.filter(n => !used.includes(n))
@@ -283,9 +287,9 @@ function renderIdeas() {
     const catName = categoryNames[item.category] || '未分类'
     const tagClass = tagClasses[item.category] || ''
     const escapedTitle = item.title.replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    const renderedContent = typeof marked !== 'undefined'
+    const renderedContent = typeof marked !== 'undefined' && !isHtmlContent(item.content)
       ? marked.parse(item.content)
-      : item.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      : item.content
     const likeCount = item.likes || 0
     const commentCount = item.comments ? item.comments.length : 0
     const hotness = likeCount + commentCount
@@ -583,7 +587,7 @@ function handleEdit(id) {
 
   editingId = id
   document.getElementById('editTitle').value = idea.title
-  document.getElementById('editContent').value = idea.content
+  document.getElementById('editContent').innerHTML = idea.content
   document.getElementById('editTags').value = (idea.tags || []).join(', ')
 
   document.querySelectorAll('#editCategorySelector .cat-option').forEach(el => {
@@ -1008,8 +1012,9 @@ function handlePublish(e) {
   }
 
   const title = document.getElementById('ideaTitle').value.trim()
-  const content = document.getElementById('ideaContent').value.trim()
-  if (!title || !content) return
+  const editor = document.getElementById('ideaContent')
+  const content = editor.innerHTML.trim()
+  if (!title || !content || content === '<br>' || content === '<div><br></div>') return
 
   const activeCat = document.querySelector('.cat-option.active')
   const category = activeCat ? activeCat.dataset.value : 'idea'
@@ -1036,6 +1041,7 @@ function handlePublish(e) {
   renderIdeas()
 
   document.getElementById('publishForm').reset()
+  document.getElementById('ideaContent').innerHTML = ''
   document.querySelectorAll('.cat-option').forEach(el => el.classList.remove('active'))
   document.querySelector('.cat-option[data-value="idea"]').classList.add('active')
 
@@ -1050,7 +1056,7 @@ function handleEditSubmit(e) {
   e.preventDefault()
 
   const title = document.getElementById('editTitle').value.trim()
-  const content = document.getElementById('editContent').value.trim()
+  const content = document.getElementById('editContent').innerHTML.trim()
   if (!title || !content || !editingId) return
 
   const activeCat = document.querySelector('#editCategorySelector .cat-option.active')
@@ -1077,6 +1083,42 @@ function handleEditSubmit(e) {
   showToast('修改已保存', 'success')
 }
 
+function insertHtmlAtCursor(editor, html) {
+  editor.focus()
+  const sel = window.getSelection()
+  if (sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+    try {
+      document.execCommand('insertHTML', false, html)
+      return
+    } catch (e) {
+      // execCommand fallback — manual insertion
+    }
+    const range = sel.getRangeAt(0)
+    range.deleteContents()
+    const temp = document.createElement('div')
+    temp.innerHTML = html
+    const frag = document.createDocumentFragment()
+    while (temp.firstChild) {
+      frag.appendChild(temp.firstChild)
+    }
+    range.insertNode(frag)
+    range.collapse(false)
+    sel.removeAllRanges()
+    sel.addRange(range)
+  } else {
+    editor.insertAdjacentHTML('beforeend', html)
+    editor.scrollTop = editor.scrollHeight
+  }
+}
+
+function getActiveEditor() {
+  const editModal = document.getElementById('editModal')
+  if (editModal && editModal.classList.contains('active')) {
+    return document.getElementById('editContent')
+  }
+  return document.getElementById('ideaContent')
+}
+
 function handleImageUpload() {
   const input = document.getElementById('imageUpload')
   const file = input.files[0]
@@ -1090,14 +1132,9 @@ function handleImageUpload() {
 
   const reader = new FileReader()
   reader.onload = (e) => {
-    const textarea = document.getElementById('ideaContent')
-    const imgMd = `\n![${file.name}](${e.target.result})\n`
-    const cursor = textarea.selectionStart
-    const before = textarea.value.substring(0, cursor)
-    const after = textarea.value.substring(cursor)
-    textarea.value = before + imgMd + after
-    textarea.focus()
-    textarea.selectionStart = textarea.selectionEnd = cursor + imgMd.length
+    const editor = getActiveEditor()
+    const imgHtml = `<div><img src="${e.target.result}" alt="${file.name}"></div><div><br></div>`
+    insertHtmlAtCursor(editor, imgHtml)
   }
   reader.readAsDataURL(file)
   input.value = ''
@@ -1646,6 +1683,10 @@ function init() {
     document.getElementById('imageUpload').click()
   })
 
+  document.getElementById('btnUploadImageEdit').addEventListener('click', () => {
+    document.getElementById('imageUpload').click()
+  })
+
   document.getElementById('imageUpload').addEventListener('change', handleImageUpload)
 
   document.getElementById('tagFilterClear').addEventListener('click', () => {
@@ -1658,6 +1699,7 @@ function init() {
   document.getElementById('editForm').addEventListener('submit', handleEditSubmit)
   document.getElementById('btnCloseEdit').addEventListener('click', () => {
     editingId = null
+    document.getElementById('editContent').innerHTML = ''
     closeModal('editModal')
   })
 
