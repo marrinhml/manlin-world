@@ -205,6 +205,7 @@ async function loadIdeas() {
       tags: idea.tags || [],
       author: idea.author_id,
       authorNickname: authorProfile.nickname || '匿名探测员',
+      authorAvatar: authorProfile.avatar || '',
       createdAt: idea.created_at,
       likes: idea.likes || 0,
       likedBy: idea.liked_by || [],
@@ -317,7 +318,7 @@ function renderIdeas() {
     const isLiked = isLoggedIn && item.likedBy && item.likedBy.includes(user)
     const isFavorited = isLoggedIn && currentUserProfile && currentUserProfile.favorites && currentUserProfile.favorites.includes(item.id)
     const style = `animation-delay: ${index * 0.06}s`
-    const authorAvatar = getUserAvatar(item.author)
+    const authorAvatar = item.authorAvatar
 
     const tagsHtml = item.tags && item.tags.length > 0
       ? `<div class="card-tags">${item.tags.map(t =>
@@ -386,7 +387,7 @@ function renderIdeas() {
         <div class="markdown-content">${renderedContent}</div>
         <div class="card-expand" data-action="view" data-id="${item.id}">展开全文 ▸</div>
         <div class="card-meta">
-          <span class="card-author" data-author="${item.author || ''}">${authorAvatar ? `<img class="card-author-avatar" src="${authorAvatar}" alt="">` : ''}${item.authorNickname || '匿名探测员'}</span>
+          <span class="card-author clickable-author" data-author="${item.author || ''}">${authorAvatar ? `<img class="card-author-avatar" src="${authorAvatar}" alt="">` : '<span class="card-author-avatar default-avatar">✦</span>'}${item.authorNickname || '匿名探测员'}</span>
           <span class="card-time">${formatDate(item.createdAt)}</span>
           ${currentSort === 'hotness' ? `<span class="card-time" style="margin-left:auto">热度 ${hotness}</span>` : ''}
         </div>
@@ -491,7 +492,7 @@ function attachCardEvents() {
     el.addEventListener('click', (e) => {
       e.stopPropagation()
       const author = el.dataset.author
-      if (author) viewUserInfo(author)
+      if (author) openUserProfile(author)
     })
   })
 
@@ -2056,20 +2057,115 @@ async function searchUsers(query) {
       .from('profiles')
       .select('id, nickname, avatar, email')
       .ilike('email', `%${query.trim()}%`)
-      .limit(10)
+      .limit(20)
+    
+    const searchResultsEl = document.getElementById('friendSearchResults')
+    const searchListEl = document.getElementById('friendSearchList')
+
     if (!results || results.length === 0) {
-      showToast('搜索失败，可能他还没来过这个世界', 'failure')
+      searchListEl.innerHTML = '<div class="friend-search-empty">搜索失败，可能他还没来过这个世界</div>'
+      searchResultsEl.style.display = ''
       return
     }
+
     const currentUserId = currentUser
     const others = results.filter(p => p.id !== currentUserId)
     if (others.length === 0) {
-      showToast('搜索失败，可能他还没来过这个世界', 'failure')
+      searchListEl.innerHTML = '<div class="friend-search-empty">搜索失败，可能他还没来过这个世界</div>'
+      searchResultsEl.style.display = ''
       return
     }
-    openUserProfile(others[0].id)
+
+    // Check friendship status for each result
+    let itemsHtml = ''
+    for (const user of others) {
+      let status = 'none' // 'none' | 'friend' | 'pending_sent' | 'pending_received'
+      let friendshipId = null
+
+      if (currentUser) {
+        const { data: friendship } = await sb
+          .from('friends')
+          .select('*')
+          .or(`and(user_id.eq.${currentUser},friend_id.eq.${user.id}),and(user_id.eq.${user.id},friend_id.eq.${currentUser})`)
+        if (friendship && friendship.length > 0) {
+          const f = friendship[0]
+          if (f.status === 'accepted') {
+            status = 'friend'
+            friendshipId = f.id
+          } else if (f.status === 'pending') {
+            status = f.user_id === currentUser ? 'pending_sent' : 'pending_received'
+          }
+        }
+      }
+
+      let actionHtml = ''
+      if (!currentUser) {
+        actionHtml = '<span class="friend-search-action" style="color:var(--text-dim)">请先登录</span>'
+      } else if (status === 'friend') {
+        actionHtml = '<span class="friend-search-action friend-action-done">已为好友</span>'
+      } else if (status === 'pending_sent') {
+        actionHtml = '<span class="friend-search-action" style="color:var(--text-dim)">已发送请求</span>'
+      } else if (status === 'pending_received') {
+        actionHtml = '<span class="friend-search-action" style="color:var(--text-dim)">对方已请求</span>'
+      } else {
+        actionHtml = `<button class="btn btn-glow btn-sm friend-search-add" data-searchuserid="${user.id}">添加+</button>`
+      }
+
+      const avatarHtml = user.avatar
+        ? `<img class="avatar-img" src="${user.avatar}" alt="">`
+        : '✦'
+
+      itemsHtml += `
+        <div class="friend-search-item">
+          <div class="friend-search-avatar">${avatarHtml}</div>
+          <div class="friend-search-info">
+            <div class="friend-search-name">${user.nickname || '探测员'}</div>
+            <div class="friend-search-email">${user.email || ''}</div>
+          </div>
+          <div class="friend-search-action-wrap">${actionHtml}</div>
+        </div>
+      `
+    }
+
+    searchListEl.innerHTML = itemsHtml
+    searchResultsEl.style.display = ''
+
+    // Attach click handlers for add buttons in search results
+    searchListEl.querySelectorAll('.friend-search-add').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation()
+        const targetUserId = btn.dataset.searchuserid
+        await sendFriendRequestFromSearch(targetUserId, btn)
+      })
+    })
   } catch (e) {
     showToast('搜索失败，可能他还没来过这个世界', 'failure')
+  }
+}
+
+async function sendFriendRequestFromSearch(friendId, btnEl) {
+  if (!currentUser) { showToast('请先登录', 'failure'); return }
+  try {
+    const { data: existing } = await sb
+      .from('friends')
+      .select('*')
+      .or(`and(user_id.eq.${currentUser},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${currentUser})`)
+    if (existing && existing.length > 0) {
+      showToast('已发送过好友请求或已是好友', 'failure')
+      return
+    }
+    const { error } = await sb
+      .from('friends')
+      .insert({ user_id: currentUser, friend_id: friendId, status: 'pending' })
+    if (error) {
+      showToast('添加好友失败', 'failure')
+      return
+    }
+    showToast('好友请求已发送', 'success')
+    // Update the button to show "已发送请求"
+    btnEl.outerHTML = '<span class="friend-search-action" style="color:var(--text-dim)">已发送请求</span>'
+  } catch (e) {
+    showToast('添加好友失败', 'failure')
   }
 }
 
@@ -2192,7 +2288,7 @@ async function openUserProfile(userId) {
       }
     }
 
-    document.getElementById('profileBody').innerHTML = html
+    document.getElementById('userProfileBody').innerHTML = html
     document.getElementById('profileModalTitle').textContent = `✦ ${profile.nickname || '探测员'} 的档案`
     openModal('userProfileModal')
   } catch (e) {
@@ -2350,6 +2446,9 @@ async function init() {
   document.getElementById('friendSearchInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') searchUsers(e.target.value)
   })
+  document.getElementById('btnCloseSearchResults').addEventListener('click', () => {
+    document.getElementById('friendSearchResults').style.display = 'none'
+  })
   document.querySelectorAll('.friend-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.friend-tab').forEach(t => t.classList.remove('active'))
@@ -2384,7 +2483,7 @@ async function init() {
       removeFriend(unfriendBtn.dataset.friendshipid, unfriendBtn.dataset.userid)
     }
   })
-  document.getElementById('btnCloseProfile').addEventListener('click', () => closeModal('userProfileModal'))
+  document.getElementById('btnCloseUserProfile').addEventListener('click', () => closeModal('userProfileModal'))
 
   document.getElementById('btnTheme').addEventListener('click', () => {
     const isLight = document.documentElement.getAttribute('data-theme') === 'light'
