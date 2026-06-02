@@ -2023,6 +2023,7 @@ function renderRequests() {
   const el = document.getElementById('friendRequests')
   if (pendingRequests.length === 0) {
     el.innerHTML = '<div class="friend-empty">暂无好友请求</div>'
+    document.getElementById('reqBadge').style.display = 'none'
     return
   }
   el.innerHTML = pendingRequests.map(r => `
@@ -2056,7 +2057,7 @@ async function searchUsers(query) {
     const { data: results } = await sb
       .from('profiles')
       .select('id, nickname, avatar, email')
-      .ilike('email', `%${query.trim()}%`)
+      .or(`email.ilike.%${query.trim()}%,nickname.ilike.%${query.trim()}%`)
       .limit(20)
     
     const searchResultsEl = document.getElementById('friendSearchResults')
@@ -2589,6 +2590,32 @@ async function init() {
   }
 }
 
+/**
+ * Auto-sync: 修复旧账号缺失的字段
+ * 用户登录时自动检测并补全 profile 中因旧版 bug 遗漏的数据
+ */
+async function autoFixProfile(profile, session) {
+  if (!profile || !session) return profile
+  let needsUpdate = false
+  let updates = {}
+
+  // Fix 1: 补全缺失的 email
+  if (!profile.email && session.user.email) {
+    updates.email = session.user.email
+    needsUpdate = true
+  }
+
+  if (needsUpdate) {
+    try {
+      await sb.from('profiles').update(updates).eq('id', currentUser)
+      return { ...profile, ...updates }
+    } catch (e) {
+      /* ignore, return original profile */
+    }
+  }
+  return profile
+}
+
 async function initSupabaseSession() {
   try {
     const { data: { session } } = await sb.auth.getSession()
@@ -2610,6 +2637,9 @@ async function initSupabaseSession() {
           .select()
           .single()
         profile = newProfile
+      } else {
+        // Auto-sync: fix missing fields for old accounts
+        profile = await autoFixProfile(profile, session)
       }
 
       currentUserProfile = profile
@@ -2633,7 +2663,8 @@ async function initSupabaseSession() {
               .single()
             currentUserProfile = newProfile
           } else {
-            currentUserProfile = data
+            // Auto-sync: fix missing fields for old accounts
+            currentUserProfile = await autoFixProfile(data, session)
           }
           updateUserUI()
           reloadIdeas()
