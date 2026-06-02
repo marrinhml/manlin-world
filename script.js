@@ -1496,7 +1496,7 @@ async function handleRegister(e) {
     return
   }
 
-  const { data, error } = await sbauth.signUp({
+  const { data, error } = await sb.auth.signUp({
     email,
     password,
     options: {
@@ -1524,7 +1524,7 @@ async function handleLogin(e) {
   const password = document.getElementById('loginPassword').value
   if (!email || !password) return
 
-  const { data, error } = await sbauth.signInWithPassword({
+  const { data, error } = await sb.auth.signInWithPassword({
     email,
     password
   })
@@ -1551,7 +1551,7 @@ async function handleLogin(e) {
 }
 
 async function handleLogout() {
-  await sbauth.signOut()
+  await sb.auth.signOut()
   currentUser = null
   currentUserProfile = null
   updateUserUI()
@@ -1644,15 +1644,15 @@ async function handleUpdateSettings(e) {
   const confirmPwd = document.getElementById('settingsConfirmPwd').value
 
   if (currPwd || newPwd || confirmPwd) {
-    const { error: signInError } = await sbauth.signInWithPassword({
-      email: (await sbauth.getUser()).data.user.email,
+    const { error: signInError } = await sb.auth.signInWithPassword({
+      email: (await sb.auth.getUser()).data.user.email,
       password: currPwd
     })
     if (signInError) { showToast('当前密码错误', 'failure'); return }
     if (newPwd && newPwd.length < 6) { showToast('新密码至少 6 位', 'failure'); return }
     if (newPwd !== confirmPwd) { showToast('两次新密码不一致', 'failure'); return }
     if (newPwd) {
-      const { error: updateError } = await sbauth.updateUser({ password: newPwd })
+      const { error: updateError } = await sb.auth.updateUser({ password: newPwd })
       if (updateError) { showToast('密码修改失败', 'failure'); return }
     }
   }
@@ -1948,7 +1948,7 @@ async function init() {
   initNetStatus()
 
   try {
-    const { data: { session } } = await sbauth.getSession()
+    const { data: { session } } = await sb.auth.getSession()
     if (session) {
       currentUser = session.user.id
       const { data: profile } = await sb
@@ -1978,7 +1978,7 @@ async function init() {
   renderIdeas()
 
   try {
-    sbauth.onAuthStateChange((event, session) => {
+    sb.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         currentUser = null
         currentUserProfile = null
@@ -1986,7 +1986,7 @@ async function init() {
         reloadIdeas()
       } else if (event === 'SIGNED_IN' && session) {
         currentUser = session.user.id
-        sbfrom('profiles').select('*').eq('id', currentUser).single().then(({ data }) => {
+        sb.from('profiles').select('*').eq('id', currentUser).single().then(({ data }) => {
           currentUserProfile = data
           updateUserUI()
           reloadIdeas()
@@ -2178,7 +2178,7 @@ async function init() {
 
 async function initSupabaseSession() {
   try {
-    const { data: { session } } = await sbauth.getSession()
+    const { data: { session } } = await sb.auth.getSession()
     if (session) {
       currentUser = session.user.id
       const { data: profile } = await sb
@@ -2188,7 +2188,7 @@ async function initSupabaseSession() {
         .single()
       currentUserProfile = profile
     }
-    sbauth.onAuthStateChange((event, session) => {
+    sb.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         currentUser = null
         currentUserProfile = null
@@ -2196,7 +2196,7 @@ async function initSupabaseSession() {
         reloadIdeas()
       } else if (event === 'SIGNED_IN' && session) {
         currentUser = session.user.id
-        sbfrom('profiles').select('*').eq('id', currentUser).single().then(({ data }) => {
+        sb.from('profiles').select('*').eq('id', currentUser).single().then(({ data }) => {
           currentUserProfile = data
           updateUserUI()
           reloadIdeas()
