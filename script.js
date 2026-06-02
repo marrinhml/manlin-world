@@ -1513,6 +1513,16 @@ async function handleRegister(e) {
     return
   }
 
+  if (data.user) {
+    const { error: profileError } = await sb
+      .from('profiles')
+      .insert({ id: data.user.id, nickname, avatar: '', favorites: [] })
+    if (profileError) {
+      showToast('注册成功，但档案创建失败', 'failure')
+      return
+    }
+  }
+
   showToast('注册成功', 'success')
   closeModal('registerModal')
   document.getElementById('registerForm').reset()
@@ -1535,11 +1545,22 @@ async function handleLogin(e) {
   }
 
   currentUser = data.user.id
-  const { data: profile } = await sb
+
+  let { data: profile } = await sb
     .from('profiles')
     .select('*')
     .eq('id', currentUser)
     .single()
+
+  if (!profile) {
+    const nickname = data.user.user_metadata?.nickname || data.user.email?.split('@')[0] || '探测员'
+    const { data: newProfile } = await sb
+      .from('profiles')
+      .insert({ id: currentUser, nickname, avatar: '', favorites: [] })
+      .select()
+      .single()
+    profile = newProfile
+  }
 
   currentUserProfile = profile
 
@@ -1951,11 +1972,23 @@ async function init() {
     const { data: { session } } = await sb.auth.getSession()
     if (session) {
       currentUser = session.user.id
-      const { data: profile } = await sb
+
+      let { data: profile } = await sb
         .from('profiles')
         .select('*')
         .eq('id', currentUser)
         .single()
+
+      if (!profile) {
+        const nickname = session.user.user_metadata?.nickname || session.user.email?.split('@')[0] || '探测员'
+        const { data: newProfile } = await sb
+          .from('profiles')
+          .insert({ id: currentUser, nickname, avatar: '', favorites: [] })
+          .select()
+          .single()
+        profile = newProfile
+      }
+
       currentUserProfile = profile
     }
     updateSupabaseStatus(true)
@@ -2181,11 +2214,23 @@ async function initSupabaseSession() {
     const { data: { session } } = await sb.auth.getSession()
     if (session) {
       currentUser = session.user.id
-      const { data: profile } = await sb
+
+      let { data: profile } = await sb
         .from('profiles')
         .select('*')
         .eq('id', currentUser)
         .single()
+
+      if (!profile) {
+        const nickname = session.user.user_metadata?.nickname || session.user.email?.split('@')[0] || '探测员'
+        const { data: newProfile } = await sb
+          .from('profiles')
+          .insert({ id: currentUser, nickname, avatar: '', favorites: [] })
+          .select()
+          .single()
+        profile = newProfile
+      }
+
       currentUserProfile = profile
     }
     sb.auth.onAuthStateChange((event, session) => {
@@ -2196,8 +2241,18 @@ async function initSupabaseSession() {
         reloadIdeas()
       } else if (event === 'SIGNED_IN' && session) {
         currentUser = session.user.id
-        sb.from('profiles').select('*').eq('id', currentUser).single().then(({ data }) => {
-          currentUserProfile = data
+        sb.from('profiles').select('*').eq('id', currentUser).single().then(async ({ data }) => {
+          if (!data) {
+            const nickname = session.user.user_metadata?.nickname || session.user.email?.split('@')[0] || '探测员'
+            const { data: newProfile } = await sb
+              .from('profiles')
+              .insert({ id: currentUser, nickname, avatar: '', favorites: [] })
+              .select()
+              .single()
+            currentUserProfile = newProfile
+          } else {
+            currentUserProfile = data
+          }
           updateUserUI()
           reloadIdeas()
         })
