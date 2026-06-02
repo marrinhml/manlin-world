@@ -68,6 +68,7 @@
               <span class="user-avatar" id="userAvatar">✦</span>
               <span class="user-name" id="userNameDisplay">探测员</span>
             </button>
+            <button class="btn btn-sm" id="btnFriends">👥 好友</button>
             <button class="btn btn-logout" id="btnLogout">退出</button>
           </div>
         </div>
@@ -618,6 +619,37 @@
         <button class="modal-close" id="btnCloseDetail">✕</button>
       </div>
       <div class="detail-body" id="detailBody"></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="friendModal">
+    <div class="modal-card friend-card">
+      <div class="modal-header">
+        <h2 class="modal-title">👥 好友</h2>
+        <button class="modal-close" id="btnCloseFriends">✕</button>
+      </div>
+      <div class="friend-body">
+        <div class="friend-search-box">
+          <input type="text" class="form-input" id="friendSearchInput" placeholder="通过邮箱搜索用户…" maxlength="100">
+          <button class="btn btn-glow btn-sm" id="btnFriendSearch">搜索</button>
+        </div>
+        <div class="friend-tabs">
+          <button class="friend-tab active" data-tab="list">好友列表</button>
+          <button class="friend-tab" data-tab="requests">好友请求 <span class="req-badge" id="reqBadge" style="display:none">0</span></button>
+        </div>
+        <div class="friend-list" id="friendList"></div>
+        <div class="friend-requests" id="friendRequests" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="userProfileModal">
+    <div class="modal-card profile-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="profileModalTitle">✦ 探测员档案</h2>
+        <button class="modal-close" id="btnCloseProfile">✕</button>
+      </div>
+      <div class="profile-body" id="profileBody"></div>
     </div>
   </div>
 

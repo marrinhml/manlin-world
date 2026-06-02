@@ -1516,7 +1516,7 @@ async function handleRegister(e) {
   if (data.user) {
     const { error: profileError } = await sb
       .from('profiles')
-      .insert({ id: data.user.id, nickname, avatar: '', favorites: [] })
+      .insert({ id: data.user.id, nickname, email, avatar: '', favorites: [] })
     if (profileError) {
       showToast('注册成功，但档案创建失败', 'failure')
       return
@@ -1553,10 +1553,11 @@ async function handleLogin(e) {
     .single()
 
   if (!profile) {
-    const nickname = data.user.user_metadata?.nickname || data.user.email?.split('@')[0] || '探测员'
+    const userEmail = data.user.email || ''
+    const nickname = data.user.user_metadata?.nickname || userEmail.split('@')[0] || '探测员'
     const { data: newProfile } = await sb
       .from('profiles')
-      .insert({ id: currentUser, nickname, avatar: '', favorites: [] })
+      .insert({ id: currentUser, nickname, email: userEmail, avatar: '', favorites: [] })
       .select()
       .single()
     profile = newProfile
@@ -1964,6 +1965,241 @@ function updateSupabaseStatus(online) {
   el.title = online ? '服务器连接正常' : '服务器连接异常，部分功能不可用'
 }
 
+let friendList = []
+let pendingRequests = []
+
+async function loadFriends() {
+  if (!currentUser) { friendList = []; pendingRequests = []; return }
+  try {
+    const { data: myFriendships } = await sb
+      .from('friends')
+      .select('*')
+      .or(`user_id.eq.${currentUser},friend_id.eq.${currentUser}`)
+    if (!myFriendships) { friendList = []; pendingRequests = []; return }
+
+    friendList = []
+    pendingRequests = []
+    for (const f of myFriendships) {
+      const isMeUser = f.user_id === currentUser
+      const otherId = isMeUser ? f.friend_id : f.user_id
+      const { data: profile } = await sb
+        .from('profiles')
+        .select('id, nickname, avatar, email')
+        .eq('id', otherId)
+        .single()
+      if (!profile) continue
+      if (f.status === 'accepted') {
+        friendList.push({ friendshipId: f.id, profile })
+      } else if (f.status === 'pending') {
+        if (!isMeUser) {
+          pendingRequests.push({ friendshipId: f.id, fromUserId: f.user_id, profile })
+        }
+      }
+    }
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+function renderFriends() {
+  const el = document.getElementById('friendList')
+  if (friendList.length === 0) {
+    el.innerHTML = '<div class="friend-empty">还没有好友，去搜索添加吧</div>'
+    return
+  }
+  el.innerHTML = friendList.map(f => `
+    <div class="friend-item" data-userid="${f.profile.id}">
+      <div class="friend-avatar clickable-avatar" data-userid="${f.profile.id}">${f.profile.avatar ? `<img class="avatar-img" src="${f.profile.avatar}" alt="">` : '✦'}</div>
+      <div class="friend-info">
+        <div class="friend-name clickable-name" data-userid="${f.profile.id}">${f.profile.nickname || '探测员'}</div>
+      </div>
+      <button class="btn btn-sm btn-remove-friend" data-friendshipid="${f.friendshipId}" data-userid="${f.profile.id}">删除</button>
+    </div>
+  `).join('')
+}
+
+function renderRequests() {
+  const el = document.getElementById('friendRequests')
+  if (pendingRequests.length === 0) {
+    el.innerHTML = '<div class="friend-empty">暂无好友请求</div>'
+    return
+  }
+  el.innerHTML = pendingRequests.map(r => `
+    <div class="friend-request-item" data-userid="${r.profile.id}">
+      <div class="friend-avatar clickable-avatar" data-userid="${r.profile.id}">${r.profile.avatar ? `<img class="avatar-img" src="${r.profile.avatar}" alt="">` : '✦'}</div>
+      <div class="friend-info">
+        <div class="friend-name clickable-name" data-userid="${r.profile.id}">${r.profile.nickname || '探测员'}</div>
+        <div class="friend-msg">请求加你为好友</div>
+      </div>
+      <button class="btn btn-glow btn-sm btn-accept-request" data-friendshipid="${r.friendshipId}">接受</button>
+    </div>
+  `).join('')
+  document.getElementById('reqBadge').textContent = pendingRequests.length
+  document.getElementById('reqBadge').style.display = ''
+}
+
+async function openFriends() {
+  await loadFriends()
+  renderFriends()
+  renderRequests()
+  document.querySelector('.friend-tab[data-tab="list"]').click()
+  openModal('friendModal')
+}
+
+async function searchUsers(query) {
+  if (!query.trim()) {
+    showToast('请输入要搜索的邮箱', 'failure')
+    return
+  }
+  try {
+    const { data: results } = await sb
+      .from('profiles')
+      .select('id, nickname, avatar, email')
+      .ilike('email', `%${query.trim()}%`)
+      .limit(10)
+    if (!results || results.length === 0) {
+      showToast('搜索失败，可能他还没来过这个世界', 'failure')
+      return
+    }
+    const currentUserId = currentUser
+    const others = results.filter(p => p.id !== currentUserId)
+    if (others.length === 0) {
+      showToast('搜索失败，可能他还没来过这个世界', 'failure')
+      return
+    }
+    openUserProfile(others[0].id)
+  } catch (e) {
+    showToast('搜索失败，可能他还没来过这个世界', 'failure')
+  }
+}
+
+async function sendFriendRequest(friendId) {
+  if (!currentUser) { showToast('请先登录', 'failure'); return }
+  try {
+    const { data: existing } = await sb
+      .from('friends')
+      .select('*')
+      .or(`and(user_id.eq.${currentUser},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${currentUser})`)
+    if (existing && existing.length > 0) {
+      showToast('已发送过好友请求或已是好友', 'failure')
+      return
+    }
+    const { error } = await sb
+      .from('friends')
+      .insert({ user_id: currentUser, friend_id: friendId, status: 'pending' })
+    if (error) {
+      showToast('添加好友失败', 'failure')
+      return
+    }
+    showToast('好友请求已发送', 'success')
+    closeModal('userProfileModal')
+  } catch (e) {
+    showToast('添加好友失败', 'failure')
+  }
+}
+
+async function acceptFriendRequest(friendshipId) {
+  try {
+    await sb.from('friends').update({ status: 'accepted' }).eq('id', friendshipId)
+    await loadFriends()
+    renderFriends()
+    renderRequests()
+    showToast('已接受好友请求', 'success')
+  } catch (e) {
+    showToast('操作失败', 'failure')
+  }
+}
+
+async function removeFriend(friendshipId, userId) {
+  try {
+    await sb.from('friends').delete().eq('id', friendshipId)
+    await loadFriends()
+    renderFriends()
+    renderRequests()
+    showToast('已删除好友', 'success')
+    closeModal('userProfileModal')
+  } catch (e) {
+    showToast('操作失败', 'failure')
+  }
+}
+
+async function openUserProfile(userId) {
+  try {
+    const { data: profile } = await sb
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+    if (!profile) {
+      showToast('未找到该用户', 'failure')
+      return
+    }
+
+    const userIdeas = ideas.filter(item => item.author === userId)
+    const totalLikes = userIdeas.reduce((sum, item) => sum + (item.likes || 0), 0)
+
+    let isFriend = false
+    let friendshipId = null
+    let requestSent = false
+    if (currentUser) {
+      const { data: friendship } = await sb
+        .from('friends')
+        .select('*')
+        .or(`and(user_id.eq.${currentUser},friend_id.eq.${userId}),and(user_id.eq.${userId},friend_id.eq.${currentUser})`)
+      if (friendship && friendship.length > 0) {
+        const f = friendship[0]
+        if (f.status === 'accepted') {
+          isFriend = true
+          friendshipId = f.id
+        } else if (f.status === 'pending') {
+          requestSent = true
+        }
+      }
+    }
+
+    const isSelf = currentUser === userId
+
+    let html = `
+      <div class="up-header">
+        <div class="up-avatar">${profile.avatar ? `<img class="avatar-img" src="${profile.avatar}" alt="">` : '✦'}</div>
+        <div class="up-info">
+          <div class="up-name">${profile.nickname || '探测员'}</div>
+          <div class="up-email">${profile.email || ''}</div>
+          <div class="up-date">注册于 ${profile.created_at ? formatDate(profile.created_at) : '-'}</div>
+        </div>
+      </div>
+      <div class="up-stats">
+        <div class="up-stat"><span>${userIdeas.length}</span> 条灵感</div>
+        <div class="up-stat"><span>${totalLikes}</span> 次赞</div>
+      </div>
+      <div class="up-posts">
+        <h3>发布的灵感</h3>
+        ${userIdeas.length === 0 ? '<div class="up-posts-empty">暂无发布</div>' :
+          [...userIdeas].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5).map(item =>
+            `<div class="up-post-item">${item.title ? item.title.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '无标题'}</div>`
+          ).join('')
+        }
+      </div>
+    `
+
+    if (!isSelf) {
+      if (isFriend) {
+        html += `<div class="up-actions"><button class="btn btn-sm" id="btnUnfriendProfile" data-friendshipid="${friendshipId}" data-userid="${userId}">已添加 · 删除好友</button></div>`
+      } else if (requestSent) {
+        html += `<div class="up-actions"><button class="btn btn-sm" disabled>已发送好友请求</button></div>`
+      } else {
+        html += `<div class="up-actions"><button class="btn btn-glow" id="btnAddFriendProfile" data-userid="${userId}">✦ 添加好友</button></div>`
+      }
+    }
+
+    document.getElementById('profileBody').innerHTML = html
+    document.getElementById('profileModalTitle').textContent = `✦ ${profile.nickname || '探测员'} 的档案`
+    openModal('userProfileModal')
+  } catch (e) {
+    showToast('加载用户档案失败', 'failure')
+  }
+}
+
 async function init() {
   loadTheme()
   initNetStatus()
@@ -1980,10 +2216,11 @@ async function init() {
         .single()
 
       if (!profile) {
-        const nickname = session.user.user_metadata?.nickname || session.user.email?.split('@')[0] || '探测员'
+        const userEmail = session.user.email || ''
+        const nickname = session.user.user_metadata?.nickname || userEmail.split('@')[0] || '探测员'
         const { data: newProfile } = await sb
           .from('profiles')
-          .insert({ id: currentUser, nickname, avatar: '', favorites: [] })
+          .insert({ id: currentUser, nickname, email: userEmail, avatar: '', favorites: [] })
           .select()
           .single()
         profile = newProfile
@@ -2105,6 +2342,50 @@ async function init() {
   document.getElementById('btnProfile').addEventListener('click', openProfile)
   document.getElementById('btnCloseProfile').addEventListener('click', () => closeModal('profileModal'))
 
+  document.getElementById('btnFriends').addEventListener('click', openFriends)
+  document.getElementById('btnCloseFriends').addEventListener('click', () => closeModal('friendModal'))
+  document.getElementById('btnFriendSearch').addEventListener('click', () => {
+    searchUsers(document.getElementById('friendSearchInput').value)
+  })
+  document.getElementById('friendSearchInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') searchUsers(e.target.value)
+  })
+  document.querySelectorAll('.friend-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.friend-tab').forEach(t => t.classList.remove('active'))
+      tab.classList.add('active')
+      const isList = tab.dataset.tab === 'list'
+      document.getElementById('friendList').style.display = isList ? '' : 'none'
+      document.getElementById('friendRequests').style.display = isList ? 'none' : ''
+    })
+  })
+
+  document.getElementById('friendModal').addEventListener('click', (e) => {
+    const avatar = e.target.closest('.clickable-avatar')
+    const name = e.target.closest('.clickable-name')
+    const acceptBtn = e.target.closest('.btn-accept-request')
+    const removeBtn = e.target.closest('.btn-remove-friend')
+    if (avatar || name) {
+      const userId = (avatar || name).dataset.userid
+      openUserProfile(userId)
+    } else if (acceptBtn) {
+      acceptFriendRequest(acceptBtn.dataset.friendshipid)
+    } else if (removeBtn) {
+      removeFriend(removeBtn.dataset.friendshipid, removeBtn.dataset.userid)
+    }
+  })
+
+  document.getElementById('userProfileModal').addEventListener('click', (e) => {
+    const addBtn = e.target.closest('#btnAddFriendProfile')
+    const unfriendBtn = e.target.closest('#btnUnfriendProfile')
+    if (addBtn) {
+      sendFriendRequest(addBtn.dataset.userid)
+    } else if (unfriendBtn) {
+      removeFriend(unfriendBtn.dataset.friendshipid, unfriendBtn.dataset.userid)
+    }
+  })
+  document.getElementById('btnCloseProfile').addEventListener('click', () => closeModal('userProfileModal'))
+
   document.getElementById('btnTheme').addEventListener('click', () => {
     const isLight = document.documentElement.getAttribute('data-theme') === 'light'
     setTheme(isLight ? 'dark' : 'light')
@@ -2222,10 +2503,11 @@ async function initSupabaseSession() {
         .single()
 
       if (!profile) {
-        const nickname = session.user.user_metadata?.nickname || session.user.email?.split('@')[0] || '探测员'
+        const userEmail = session.user.email || ''
+        const nickname = session.user.user_metadata?.nickname || userEmail.split('@')[0] || '探测员'
         const { data: newProfile } = await sb
           .from('profiles')
-          .insert({ id: currentUser, nickname, avatar: '', favorites: [] })
+          .insert({ id: currentUser, nickname, email: userEmail, avatar: '', favorites: [] })
           .select()
           .single()
         profile = newProfile
@@ -2243,10 +2525,11 @@ async function initSupabaseSession() {
         currentUser = session.user.id
         sb.from('profiles').select('*').eq('id', currentUser).single().then(async ({ data }) => {
           if (!data) {
-            const nickname = session.user.user_metadata?.nickname || session.user.email?.split('@')[0] || '探测员'
+            const userEmail = session.user.email || ''
+            const nickname = session.user.user_metadata?.nickname || userEmail.split('@')[0] || '探测员'
             const { data: newProfile } = await sb
               .from('profiles')
-              .insert({ id: currentUser, nickname, avatar: '', favorites: [] })
+              .insert({ id: currentUser, nickname, email: userEmail, avatar: '', favorites: [] })
               .select()
               .single()
             currentUserProfile = newProfile
