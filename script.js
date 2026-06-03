@@ -412,12 +412,13 @@ function renderIdeas() {
             <span class="action-icon">↗</span>
           </button>
           <span class="card-actions-divider"></span>
+          ${isLoggedIn && item.author === currentUser ? `
           <button class="card-action-btn action-edit" data-action="edit" data-id="${item.id}">
             <span class="action-icon">✎</span>
           </button>
           <button class="card-action-btn action-delete" data-action="delete" data-id="${item.id}">
             <span class="action-icon">✕</span>
-          </button>
+          </button>` : ''}
         </div>
         <div class="card-comments" id="comments-${item.id}">
           <div class="comment-list">${commentsHtml}</div>
