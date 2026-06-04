@@ -278,40 +278,19 @@ function updateSectionInfo() {
 }
 
 function renderIdeas() {
-  // ── 筛选状态变化时强制重渲染 ──
-  const filterKey = currentFilter + '|' + currentSort + '|' + currentTag + '|' + searchQuery
-  if (filterKey !== window.__rk_filterKey) {
-    window.__rk = null // 筛选状态变了，忽略数据哈希
-    window.__rk_filterKey = filterKey
-  }
-
-  // 跳过纯数据未变且筛选未变的重复渲染（仅点赞/评论数波动时）
-  const _rk = ideas.map(i => i.id+':'+i.likes+','+(i.comments?.length||0)+','+(i.likedBy?.length||0)).join('|')
-  if (_rk === window.__rk && ideas.length > 0 && window.__rk_user === (currentUser||'')) return
-  window.__rk = _rk
-  window.__rk_user = currentUser||''
-
   const grid = document.getElementById('cardsGrid')
+  if (!grid) return
+
   const filtered = getDisplayIdeas()
   updateSectionInfo()
 
   if (ideas.length === 0) {
-    grid.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">⟡</div>
-        <p class="empty-text">世界尚无一物</p>
-        <p class="empty-hint">点击「发布新内容」写下你的第一个科幻灵感</p>
-      </div>`
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⟡</div><p class="empty-text">世界尚无一物</p><p class="empty-hint">点击「发布新内容」写下你的第一个科幻灵感</p></div>`
     return
   }
 
   if (filtered.length === 0) {
-    grid.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">⟡</div>
-        <p class="empty-text">没有匹配的内容</p>
-        <p class="empty-hint">试试其他关键词或分类</p>
-      </div>`
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⟡</div><p class="empty-text">没有匹配的内容</p><p class="empty-hint">试试其他关键词或分类</p></div>`
     return
   }
 
@@ -324,9 +303,7 @@ function renderIdeas() {
     const catName = categoryNames[item.category] || '未分类'
     const tagClass = tagClasses[item.category] || ''
     const escapedTitle = item.title.replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    const renderedContent = typeof marked !== 'undefined' && !isHtmlContent(item.content)
-      ? marked.parse(item.content)
-      : item.content
+    const renderedContent = typeof marked !== 'undefined' && !isHtmlContent(item.content) ? marked.parse(item.content) : item.content
     const likeCount = item.likes || 0
     const commentCount = item.comments ? item.comments.length : 0
     const hotness = likeCount + commentCount
@@ -334,13 +311,9 @@ function renderIdeas() {
     const isFavorited = isLoggedIn && currentUserProfile && currentUserProfile.favorites && currentUserProfile.favorites.includes(item.id)
     const style = `animation-delay: ${index * 0.06}s`
     const authorAvatar = item.authorAvatar
-
     const tagsHtml = item.tags && item.tags.length > 0
-      ? `<div class="card-tags">${item.tags.map(t =>
-          `<span class="card-tag-item" data-action="tag" data-tag="${t.replace(/"/g, '&quot;')}">#${t.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`
-        ).join('')}</div>`
+      ? `<div class="card-tags">${item.tags.map(t => `<span class="card-tag-item" data-action="tag" data-tag="${t.replace(/"/g, '&quot;')}">#${t.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`).join('')}</div>`
       : ''
-
     const commentsHtml = item.comments && item.comments.length > 0
       ? item.comments.map(c => {
           const cText = c.text.replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -355,95 +328,13 @@ function renderIdeas() {
                 const rAvatar = getUserAvatar(r.author)
                 const rAvatarHtml = rAvatar ? `<img class="comment-avatar-img" src="${rAvatar}" alt="">` : '<div class="comment-avatar">✦</div>'
                 const rIsLiked = isLoggedIn && r.likedBy && r.likedBy.includes(user)
-                return `
-                <div class="reply-item">
-                  ${rAvatarHtml}
-                  <div class="comment-body">
-                    <div class="comment-author">${rNickname}</div>
-                    <div class="comment-text">${rText}</div>
-                    <div class="comment-sub-actions">
-                      <button class="comment-sub-btn ${rIsLiked ? 'liked' : ''}" data-action="replyLike" data-idea-id="${item.id}" data-comment-id="${c.id}" data-reply-id="${r.id}">
-                        <span class="sub-icon">${rIsLiked ? '♥' : '♡'}</span>
-                        <span class="sub-count">${r.likes || 0}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>`
-              }).join('')
+                return `<div class="reply-item">${rAvatarHtml}<div class="comment-body"><div class="comment-author">${rNickname}</div><div class="comment-text">${rText}</div><div class="comment-sub-actions"><button class="comment-sub-btn ${rIsLiked ? 'liked' : ''}" data-action="replyLike" data-idea-id="${item.id}" data-comment-id="${c.id}" data-reply-id="${r.id}"><span class="sub-icon">${rIsLiked ? '♥' : '♡'}</span><span class="sub-count">${r.likes || 0}</span></button></div></div></div>`
+            }).join('')
             : ''
-          return `
-            <div class="comment-item" data-comment-id="${c.id}">
-              ${cAvatarHtml}
-              <div class="comment-body">
-                <div class="comment-author">${cNickname}</div>
-                <div class="comment-text">${cText}</div>
-                <div class="comment-sub-actions">
-                  <button class="comment-sub-btn ${cIsLiked ? 'liked' : ''}" data-action="commentLike" data-idea-id="${item.id}" data-comment-id="${c.id}">
-                    <span class="sub-icon">${cIsLiked ? '♥' : '♡'}</span>
-                    <span class="sub-count">${c.likes || 0}</span>
-                  </button>
-                  ${isLoggedIn ? `<button class="comment-sub-btn" data-action="toggleReply" data-idea-id="${item.id}" data-comment-id="${c.id}">↩ 回复</button>` : ''}
-                </div>
-                ${repliesHtml}
-                <div class="reply-form" id="replyForm-${item.id}-${c.id}" style="display:none">
-                  <input type="text" class="reply-input" id="replyInput-${item.id}-${c.id}" placeholder="写下回复…" maxlength="200">
-                  <button class="reply-submit" data-action="submitReply" data-idea-id="${item.id}" data-comment-id="${c.id}">发送</button>
-                </div>
-              </div>
-            </div>`
+          return `<div class="comment-item" data-comment-id="${c.id}">${cAvatarHtml}<div class="comment-body"><div class="comment-author">${cNickname}</div><div class="comment-text">${cText}</div><div class="comment-sub-actions"><button class="comment-sub-btn ${cIsLiked ? 'liked' : ''}" data-action="commentLike" data-idea-id="${item.id}" data-comment-id="${c.id}"><span class="sub-icon">${cIsLiked ? '♥' : '♡'}</span><span class="sub-count">${c.likes || 0}</span></button>${isLoggedIn ? `<button class="comment-sub-btn" data-action="toggleReply" data-idea-id="${item.id}" data-comment-id="${c.id}">↩ 回复</button>` : ''}</div>${repliesHtml}<div class="reply-form" id="replyForm-${item.id}-${c.id}" style="display:none"><input type="text" class="reply-input" id="replyInput-${item.id}-${c.id}" placeholder="写下回复…" maxlength="200"><button class="reply-submit" data-action="submitReply" data-idea-id="${item.id}" data-comment-id="${c.id}">发送</button></div></div></div>`
         }).join('')
       : '<div class="comment-item" style="border:none;padding:4px 0"><div class="comment-text" style="color:var(--text-dim);font-size:12px">暂无评论</div></div>'
-
-    return `
-      <article class="idea-card" data-id="${item.id}" style="${style}">
-        <span class="card-tag ${tagClass}">${catName}</span>
-        <h3 class="card-title" data-action="view" data-id="${item.id}">${escapedTitle}</h3>
-        ${tagsHtml}
-        <div class="markdown-content">${renderedContent}</div>
-        <div class="card-expand" data-action="view" data-id="${item.id}">展开全文 ▸</div>
-        <div class="card-meta">
-          <span class="card-author clickable-author" data-action="author" data-author="${item.author || ''}">${authorAvatar ? `<img class="card-author-avatar" src="${authorAvatar}" alt="">` : '<span class="card-author-avatar default-avatar">✦</span>'}${item.authorNickname || '匿名探测员'}</span>
-          <span class="card-time">${formatDate(item.createdAt)}</span>
-          ${currentSort === 'hotness' ? `<span class="card-time" style="margin-left:auto">热度 ${hotness}</span>` : ''}
-        </div>
-        <div class="card-actions">
-          <button class="card-action-btn ${isLiked ? 'liked' : ''}" data-action="like" data-id="${item.id}">
-            <span class="action-icon">${isLiked ? '♥' : '♡'}</span>
-            <span class="action-count">${likeCount}</span>
-          </button>
-          <button class="card-action-btn" data-action="comment" data-id="${item.id}">
-            <span class="action-icon">◷</span>
-            <span class="action-count">${commentCount}</span>
-          </button>
-          <span class="card-action-stat">
-            <span class="action-icon">◎</span>
-            <span class="card-view-count">${item.views || 0}</span>
-          </span>
-          ${isLoggedIn ? `
-          <button class="card-action-btn ${isFavorited ? 'favorited' : ''}" data-action="favorite" data-id="${item.id}">
-            <span class="action-icon">${isFavorited ? '★' : '☆'}</span>
-          </button>` : ''}
-          <button class="card-action-btn" data-action="share" data-id="${item.id}">
-            <span class="action-icon">↗</span>
-          </button>
-          <span class="card-actions-divider"></span>
-          ${isLoggedIn && item.author === currentUser ? `
-          <button class="card-action-btn action-edit" data-action="edit" data-id="${item.id}">
-            <span class="action-icon">✎</span>
-          </button>
-          <button class="card-action-btn action-delete" data-action="delete" data-id="${item.id}">
-            <span class="action-icon">✕</span>
-          </button>` : ''}
-        </div>
-        <div class="card-comments" id="comments-${item.id}">
-          <div class="comment-list">${commentsHtml}</div>
-          ${isLoggedIn ? `
-          <div class="comment-form">
-            <input type="text" class="comment-input" id="commentInput-${item.id}" placeholder="写下你的评论…" maxlength="200">
-            <button class="comment-submit" data-action="submitComment" data-id="${item.id}">发送</button>
-          </div>` : ''}
-        </div>
-      </article>`
+    return `<article class="idea-card" data-id="${item.id}" style="${style}"><span class="card-tag ${tagClass}">${catName}</span><h3 class="card-title" data-action="view" data-id="${item.id}">${escapedTitle}</h3>${tagsHtml}<div class="markdown-content">${renderedContent}</div><div class="card-expand" data-action="view" data-id="${item.id}">展开全文 ▸</div><div class="card-meta"><span class="card-author clickable-author" data-action="author" data-author="${item.author || ''}">${authorAvatar ? `<img class="card-author-avatar" src="${authorAvatar}" alt="">` : '<span class="card-author-avatar default-avatar">✦</span>'}${item.authorNickname || '匿名探测员'}</span><span class="card-time">${formatDate(item.createdAt)}</span>${currentSort === 'hotness' ? `<span class="card-time" style="margin-left:auto">热度 ${hotness}</span>` : ''}</div><div class="card-actions"><button class="card-action-btn ${isLiked ? 'liked' : ''}" data-action="like" data-id="${item.id}"><span class="action-icon">${isLiked ? '♥' : '♡'}</span><span class="action-count">${likeCount}</span></button><button class="card-action-btn" data-action="comment" data-id="${item.id}"><span class="action-icon">◷</span><span class="action-count">${commentCount}</span></button><span class="card-action-stat"><span class="action-icon">◎</span><span class="card-view-count">${item.views || 0}</span></span>${isLoggedIn ? `<button class="card-action-btn ${isFavorited ? 'favorited' : ''}" data-action="favorite" data-id="${item.id}"><span class="action-icon">${isFavorited ? '★' : '☆'}</span></button>` : ''}<button class="card-action-btn" data-action="share" data-id="${item.id}"><span class="action-icon">↗</span></button><span class="card-actions-divider"></span>${isLoggedIn && item.author === currentUser ? `<button class="card-action-btn action-edit" data-action="edit" data-id="${item.id}"><span class="action-icon">✎</span></button><button class="card-action-btn action-delete" data-action="delete" data-id="${item.id}"><span class="action-icon">✕</span></button>` : ''}</div><div class="card-comments" id="comments-${item.id}"><div class="comment-list">${commentsHtml}</div>${isLoggedIn ? `<div class="comment-form"><input type="text" class="comment-input" id="commentInput-${item.id}" placeholder="写下你的评论…" maxlength="200"><button class="comment-submit" data-action="submitComment" data-id="${item.id}">发送</button></div>` : ''}</div></article>`
   }).join('')
 
   observeCards()
@@ -863,11 +754,17 @@ function fallbackCopy(text) {
 }
 
 function setFilter(filter) {
-  console.log('[调试] setFilter:', filter, '| 当前数据 categories:', [...new Set(ideas.map(i => i.category))])
   currentFilter = filter
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.filter === filter)
   })
+
+  // 更新标题
+  const titleEl = document.getElementById('sectionTitle')
+  if (titleEl) {
+    if (filter === 'all') titleEl.textContent = '全部内容'
+    else titleEl.textContent = categoryNames[filter] || '全部内容'
+  }
 
   if (filter === 'news') {
     document.getElementById('contentSection').style.display = 'none'
@@ -876,11 +773,8 @@ function setFilter(filter) {
     document.getElementById('tagFilterBar').style.display = 'none'
     const newsSection = document.getElementById('newsSection')
     newsSection.style.display = 'block'
-    if (!newsCache) {
-      fetchNews()
-    } else {
-      renderNews(newsCache)
-    }
+    if (!newsCache) fetchNews()
+    else renderNews(newsCache)
   } else {
     document.getElementById('contentSection').style.display = 'block'
     document.getElementById('searchSortRow').style.display = 'flex'
