@@ -275,8 +275,8 @@ function updateSectionInfo() {
 }
 
 function renderIdeas() {
-  // 跳过数据未变时的重复渲染（移动端防频闪优化）
-  const _rk = ideas.map(i => i.id+':'+i.likes+','+(i.comments?.length||0)+','+(i.likedBy?.length||0)).join('|')
+  // 跳过数据未变且筛选状态未变时的重复渲染（移动端防频闪优化）
+  const _rk = ideas.map(i => i.id+':'+i.likes+','+(i.comments?.length||0)+','+(i.likedBy?.length||0)).join('|') + '|' + currentFilter + '|' + currentSort + '|' + currentTag + '|' + searchQuery
   if (_rk === window.__rk && ideas.length > 0 && window.__rk_user === (currentUser||'')) return
   window.__rk = _rk
   window.__rk_user = currentUser||''
