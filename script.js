@@ -200,7 +200,7 @@ async function loadIdeas() {
       id: idea.id,
       title: idea.title,
       content: idea.content,
-      category: idea.category,
+      category: idea.category || 'idea',
       tags: idea.tags || [],
       author: idea.author_id,
       authorNickname: authorProfile.nickname || '匿名探测员',
@@ -271,12 +271,22 @@ function updateSectionInfo() {
   }
 
   const suffix = searchQuery.trim() ? ' (搜索结果)' : ''
-  countEl.textContent = `${filtered.length} 条记录${suffix}`
+  const catDebug = currentFilter === 'all' && ideas.length > 0
+    ? ` | ${['idea','concept','essay'].map(c => categoryNames[c] + ':' + ideas.filter(i => i.category === c).length).join(' ')}`
+    : ''
+  countEl.textContent = `${filtered.length} 条记录${suffix}${catDebug}`
 }
 
 function renderIdeas() {
-  // 跳过数据未变且筛选状态未变时的重复渲染（移动端防频闪优化）
-  const _rk = ideas.map(i => i.id+':'+i.likes+','+(i.comments?.length||0)+','+(i.likedBy?.length||0)).join('|') + '|' + currentFilter + '|' + currentSort + '|' + currentTag + '|' + searchQuery
+  // ── 筛选状态变化时强制重渲染 ──
+  const filterKey = currentFilter + '|' + currentSort + '|' + currentTag + '|' + searchQuery
+  if (filterKey !== window.__rk_filterKey) {
+    window.__rk = null // 筛选状态变了，忽略数据哈希
+    window.__rk_filterKey = filterKey
+  }
+
+  // 跳过纯数据未变且筛选未变的重复渲染（仅点赞/评论数波动时）
+  const _rk = ideas.map(i => i.id+':'+i.likes+','+(i.comments?.length||0)+','+(i.likedBy?.length||0)).join('|')
   if (_rk === window.__rk && ideas.length > 0 && window.__rk_user === (currentUser||'')) return
   window.__rk = _rk
   window.__rk_user = currentUser||''
@@ -853,6 +863,7 @@ function fallbackCopy(text) {
 }
 
 function setFilter(filter) {
+  console.log('[调试] setFilter:', filter, '| 当前数据 categories:', [...new Set(ideas.map(i => i.category))])
   currentFilter = filter
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.filter === filter)
