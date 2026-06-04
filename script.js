@@ -1248,7 +1248,7 @@ async function handlePublish(e) {
   const content = editor.innerHTML.trim()
   if (!title || !content || content === '<br>' || content === '<div><br></div>') return
 
-  const activeCat = document.querySelector('.cat-option.active')
+  const activeCat = document.querySelector('#publishForm .cat-option.active')
   const category = activeCat ? activeCat.dataset.value : 'idea'
 
   const nickname = currentUserProfile ? currentUserProfile.nickname : '匿名探测员'
@@ -1294,8 +1294,8 @@ async function handlePublish(e) {
 
   document.getElementById('publishForm').reset()
   document.getElementById('ideaContent').innerHTML = ''
-  document.querySelectorAll('.cat-option').forEach(el => el.classList.remove('active'))
-  document.querySelector('.cat-option[data-value="idea"]').classList.add('active')
+  document.querySelectorAll('#publishForm .cat-option').forEach(el => el.classList.remove('active'))
+  document.querySelector('#publishForm .cat-option[data-value="idea"]').classList.add('active')
 
   if (currentFilter !== 'all' && currentFilter !== category) {
     setFilter('all')
@@ -2418,9 +2418,9 @@ async function init() {
     renderIdeas()
   })
 
-  document.querySelectorAll('.cat-option').forEach(btn => {
+  document.querySelectorAll('#publishForm .cat-option').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.cat-option').forEach(el => el.classList.remove('active'))
+      document.querySelectorAll('#publishForm .cat-option').forEach(el => el.classList.remove('active'))
       btn.classList.add('active')
     })
   })
