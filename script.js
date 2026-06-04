@@ -271,10 +271,7 @@ function updateSectionInfo() {
   }
 
   const suffix = searchQuery.trim() ? ' (搜索结果)' : ''
-  const catDebug = ideas.length > 0
-    ? ` | [${['idea','concept','essay'].map(c => categoryNames[c] + ':' + ideas.filter(i => i.category === c).length).join(' ')}]`
-    : ''
-  countEl.textContent = `${filtered.length} 条记录${suffix}${catDebug}`
+  countEl.textContent = `${filtered.length} 条记录${suffix}`
 }
 
 function renderIdeas() {
@@ -782,14 +779,6 @@ function setFilter(filter) {
     document.getElementById('publishSection').style.display = ''
     updateTagFilterBar()
     renderIdeas()
-    // 调试信息：显示当前筛选状态和类别分布
-    const countEl = document.getElementById('sectionCount')
-    if (countEl) {
-      const catCounts = ['idea','concept','essay'].map(c => 
-        categoryNames[c] + ':' + ideas.filter(i => i.category === c).length
-      ).join(' ')
-      countEl.textContent += ` 筛选:[${filter}] 分布:[${catCounts}]`
-    }
   }
 }
 
