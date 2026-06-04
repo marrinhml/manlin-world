@@ -2602,8 +2602,8 @@ async function init() {
           })
         })
       }
-    }, 2000)
-    setTimeout(() => clearInterval(checkTimer), 30000)
+    }, 500)
+    setTimeout(() => clearInterval(checkTimer), 20000)
   }
 
   // 背景音乐控制
