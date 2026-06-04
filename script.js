@@ -327,7 +327,7 @@ function renderIdeas() {
 
     const tagsHtml = item.tags && item.tags.length > 0
       ? `<div class="card-tags">${item.tags.map(t =>
-          `<span class="card-tag-item" data-tag="${t.replace(/"/g, '&quot;')}">#${t.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`
+          `<span class="card-tag-item" data-action="tag" data-tag="${t.replace(/"/g, '&quot;')}">#${t.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`
         ).join('')}</div>`
       : ''
 
@@ -392,7 +392,7 @@ function renderIdeas() {
         <div class="markdown-content">${renderedContent}</div>
         <div class="card-expand" data-action="view" data-id="${item.id}">展开全文 ▸</div>
         <div class="card-meta">
-          <span class="card-author clickable-author" data-author="${item.author || ''}">${authorAvatar ? `<img class="card-author-avatar" src="${authorAvatar}" alt="">` : '<span class="card-author-avatar default-avatar">✦</span>'}${item.authorNickname || '匿名探测员'}</span>
+          <span class="card-author clickable-author" data-action="author" data-author="${item.author || ''}">${authorAvatar ? `<img class="card-author-avatar" src="${authorAvatar}" alt="">` : '<span class="card-author-avatar default-avatar">✦</span>'}${item.authorNickname || '匿名探测员'}</span>
           <span class="card-time">${formatDate(item.createdAt)}</span>
           ${currentSort === 'hotness' ? `<span class="card-time" style="margin-left:auto">热度 ${hotness}</span>` : ''}
         </div>
@@ -436,131 +436,53 @@ function renderIdeas() {
       </article>`
   }).join('')
 
-  attachCardEvents()
   observeCards()
 }
 
-function attachCardEvents() {
-  document.querySelectorAll('[data-action="like"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      handleLike(btn.dataset.id)
-    })
+function initCardDelegation() {
+  const grid = document.getElementById('cardsGrid')
+  if (!grid || grid._delegationReady) return
+  grid._delegationReady = true
+
+  grid.addEventListener('click', (e) => {
+    const target = e.target.closest('[data-action]')
+    if (!target) return
+    e.stopPropagation()
+    const action = target.dataset.action
+    const { id, ideaId, commentId, replyId, author, tag } = target.dataset
+
+    switch (action) {
+      case 'like':        handleLike(id); break
+      case 'comment':     toggleComments(id); break
+      case 'edit':        handleEdit(id); break
+      case 'delete':      handleDelete(id); break
+      case 'submitComment': handleSubmitComment(id); break
+      case 'favorite':    handleFavorite(id); break
+      case 'share':       handleShare(id); break
+      case 'view':        openDetailModal(id); break
+      case 'commentLike': handleCommentLike(ideaId, commentId); break
+      case 'replyLike':   handleReplyLike(ideaId, commentId, replyId); break
+      case 'toggleReply': handleToggleReply(ideaId, commentId); break
+      case 'submitReply': handleSubmitReply(ideaId, commentId); break
+      case 'author':      if (author) openUserProfile(author); break
+      case 'tag':         setTag(currentTag === tag ? '' : tag); break
+    }
   })
 
-  document.querySelectorAll('[data-action="comment"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      toggleComments(btn.dataset.id)
-    })
-  })
-
-  document.querySelectorAll('[data-action="edit"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      handleEdit(btn.dataset.id)
-    })
-  })
-
-  document.querySelectorAll('[data-action="delete"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      handleDelete(btn.dataset.id)
-    })
-  })
-
-  document.querySelectorAll('[data-action="submitComment"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      handleSubmitComment(btn.dataset.id)
-    })
-  })
-
-  document.querySelectorAll('.comment-input').forEach(input => {
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault()
-        const id = input.id.replace('commentInput-', '')
-        handleSubmitComment(id)
-      }
-    })
-  })
-
-  document.querySelectorAll('.card-tag-item').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation()
-      const tag = el.dataset.tag
-      setTag(currentTag === tag ? '' : tag)
-    })
-  })
-
-  document.querySelectorAll('.card-author').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation()
-      const author = el.dataset.author
-      if (author) openUserProfile(author)
-    })
-  })
-
-  document.querySelectorAll('[data-action="favorite"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      handleFavorite(btn.dataset.id)
-    })
-  })
-
-  document.querySelectorAll('[data-action="share"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      handleShare(btn.dataset.id)
-    })
-  })
-
-  document.querySelectorAll('[data-action="view"]').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation()
-      openDetailModal(el.dataset.id)
-    })
-  })
-
-  document.querySelectorAll('[data-action="commentLike"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      handleCommentLike(btn.dataset.ideaId, btn.dataset.commentId)
-    })
-  })
-
-  document.querySelectorAll('[data-action="replyLike"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      handleReplyLike(btn.dataset.ideaId, btn.dataset.commentId, btn.dataset.replyId)
-    })
-  })
-
-  document.querySelectorAll('[data-action="toggleReply"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      handleToggleReply(btn.dataset.ideaId, btn.dataset.commentId)
-    })
-  })
-
-  document.querySelectorAll('[data-action="submitReply"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      handleSubmitReply(btn.dataset.ideaId, btn.dataset.commentId)
-    })
-  })
-
-  document.querySelectorAll('.reply-input').forEach(input => {
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault()
-        const parts = input.id.replace('replyInput-', '').split('-')
-        if (parts.length === 2) {
-          handleSubmitReply(parts[0], parts[1])
-        }
-      }
-    })
+  grid.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return
+    const input = e.target.closest('.comment-input')
+    if (input) {
+      e.preventDefault()
+      handleSubmitComment(input.id.replace('commentInput-', ''))
+      return
+    }
+    const replyInput = e.target.closest('.reply-input')
+    if (replyInput) {
+      e.preventDefault()
+      const parts = replyInput.id.replace('replyInput-', '').split('-')
+      if (parts.length === 2) handleSubmitReply(parts[0], parts[1])
+    }
   })
 }
 
@@ -1839,16 +1761,21 @@ function observeCards() {
   const cards = document.querySelectorAll('.idea-card:not(.in-view)')
   if (cards.length === 0) return
 
-  const observer = new IntersectionObserver((entries) => {
+  if (window._cardObserver) {
+    cards.forEach(card => window._cardObserver.observe(card))
+    return
+  }
+
+  window._cardObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
         entry.target.classList.add('in-view')
-        observer.unobserve(entry.target)
+        window._cardObserver.unobserve(entry.target)
       }
     })
   }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' })
 
-  cards.forEach(card => observer.observe(card))
+  cards.forEach(card => window._cardObserver.observe(card))
 }
 
 function handleSplashEnter() {
@@ -2662,6 +2589,9 @@ async function init() {
       localStorage.setItem('musicTime', bgAudio.currentTime.toString())
     })
   }
+
+  // 事件委托：卡片网格交互（一次性注册，替代每次 render 逐个绑定）
+  initCardDelegation()
 }
 
 /**
