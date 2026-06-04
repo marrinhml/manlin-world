@@ -1,6 +1,5 @@
 const THEME_KEY = 'manlin_theme'
 const NEWS_CACHE_KEY = 'manlin_news'
-const NEWS_CACHE_TIME = 30 * 60 * 1000
 
 const SUPABASE_URL = 'https://dilpctjvgsyeifqqhrvj.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpbHBjdGp2Z3N5ZWlmcXFocnZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMzc0NDksImV4cCI6MjA5NTgxMzQ0OX0.hCgveTOnErouZMFNQtQxyXBByMpwa6-9inLYTNm692Y'
@@ -276,6 +275,12 @@ function updateSectionInfo() {
 }
 
 function renderIdeas() {
+  // 跳过数据未变时的重复渲染（移动端防频闪优化）
+  const _rk = ideas.map(i => i.id+':'+i.likes+','+(i.comments?.length||0)+','+(i.likedBy?.length||0)).join('|')
+  if (_rk === window.__rk && ideas.length > 0 && window.__rk_user === (currentUser||'')) return
+  window.__rk = _rk
+  window.__rk_user = currentUser||''
+
   const grid = document.getElementById('cardsGrid')
   const filtered = getDisplayIdeas()
   updateSectionInfo()
@@ -646,8 +651,7 @@ function openDetailModal(id) {
   const authorNickname = idea.authorNickname || '匿名探测员'
   const authorAvatar = getUserAvatar(idea.author)
   const date = formatDate(idea.createdAt)
-  const catNames = { idea: '科幻点子', concept: '科幻概念', story: '科幻故事', tech: '科技资讯' }
-  const catName = catNames[idea.category] || '科幻点子'
+  const catName = categoryNames[idea.category] || '未分类'
 
   let renderedContent = idea.content
   if (typeof marked !== 'undefined' && !isHtmlContent(idea.content)) {
@@ -1848,6 +1852,8 @@ function observeCards() {
 }
 
 function handleSplashEnter() {
+  if (window._splashEntering) return
+  window._splashEntering = true
   const splash = document.getElementById('splashScreen')
   const content = splash.querySelector('.splash-content')
   const loading = document.getElementById('splashLoading')
@@ -1886,6 +1892,16 @@ function handleSplashEnter() {
         setTimeout(() => {
           splash.style.display = 'none'
           document.body.classList.add('reveal')
+          // 封面进入后自动播放背景音乐
+          const audio = document.getElementById('bgAudio')
+          const musicBtn = document.getElementById('btnMusic')
+          if (audio && musicBtn && !window._musicPlaying) {
+            audio.play().then(() => {
+              window._musicPlaying = true
+              musicBtn.classList.add('playing')
+              localStorage.setItem('musicPlaying', 'true')
+            }).catch(() => {})
+          }
           setTimeout(() => {
             openAbout()
           }, 500)
@@ -2588,6 +2604,63 @@ async function init() {
       }
     }, 2000)
     setTimeout(() => clearInterval(checkTimer), 30000)
+  }
+
+  // 背景音乐控制
+  const bgAudio = document.getElementById('bgAudio')
+  const btnMusic = document.getElementById('btnMusic')
+  const musicBarFill = document.getElementById('musicBarFill')
+  window._musicPlaying = false
+
+  // 读取上次播放状态（浏览器会阻止无用户交互的自动播放，静默失败即可）
+  const musicState = localStorage.getItem('musicPlaying')
+  if (musicState === 'true' && bgAudio) {
+    bgAudio.currentTime = parseFloat(localStorage.getItem('musicTime') || '0')
+    bgAudio.play().then(() => {
+      window._musicPlaying = true
+      btnMusic.classList.add('playing')
+    }).catch(() => { /* 浏览器阻止自动播放 */ })
+  }
+
+  if (btnMusic) {
+    btnMusic.addEventListener('click', () => {
+      if (!bgAudio) return
+      if (window._musicPlaying) {
+        bgAudio.pause()
+        btnMusic.classList.remove('playing')
+        localStorage.setItem('musicPlaying', 'false')
+      } else {
+        bgAudio.play().then(() => {
+          btnMusic.classList.add('playing')
+          localStorage.setItem('musicPlaying', 'true')
+        }).catch(() => {
+          showToast('请先与页面交互后再播放音乐', 'failure')
+        })
+      }
+      window._musicPlaying = !window._musicPlaying
+    })
+  }
+
+  // 更新播放进度条（节流：移动端每500ms更新一次以减轻性能负担）
+  if (bgAudio) {
+    let lastUpdate = 0
+    bgAudio.addEventListener('timeupdate', () => {
+      const now = Date.now()
+      if (now - lastUpdate < 200) return
+      lastUpdate = now
+      if (bgAudio.duration) {
+        const pct = (bgAudio.currentTime / bgAudio.duration) * 100
+        musicBarFill.style.width = pct + '%'
+      }
+      // 每5秒保存一次播放位置
+      if (Math.floor(bgAudio.currentTime) % 5 === 0) {
+        localStorage.setItem('musicTime', bgAudio.currentTime.toString())
+      }
+    })
+    bgAudio.addEventListener('pause', () => {
+      localStorage.setItem('musicPlaying', 'false')
+      localStorage.setItem('musicTime', bgAudio.currentTime.toString())
+    })
   }
 }
 
