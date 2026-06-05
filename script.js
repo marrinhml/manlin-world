@@ -2681,47 +2681,152 @@ async function init() {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)()
       spaceAudio = ctx
+      spaceAudio._timers = []
 
-      // 主音量控制器
       const master = ctx.createGain()
       master.gain.value = 0.35
       master.connect(ctx.destination)
 
-      // 1) 深空低频嗡鸣 (80Hz, 手机也能听见一点)
-      const osc1 = ctx.createOscillator()
-      osc1.type = 'sine'; osc1.frequency.value = 80
-      const g1 = ctx.createGain(); g1.gain.value = 0.3
-      osc1.connect(g1).connect(master); osc1.start()
+      // === 太空混响（延迟 + 反馈，营造深邃空间感） ===
+      const delay = ctx.createDelay(1.5)
+      delay.delayTime.value = 0.9
+      const feedback = ctx.createGain()
+      feedback.gain.value = 0.18
+      const wet = ctx.createGain()
+      wet.gain.value = 0.3
+      delay.connect(feedback)
+      feedback.connect(delay)
+      delay.connect(wet)
+      wet.connect(master)
 
-      // 2) 中频缓慢起伏 (130Hz, 带颤音效果)
-      const osc2 = ctx.createOscillator()
-      osc2.type = 'sine'; osc2.frequency.value = 130
-      const g2 = ctx.createGain(); g2.gain.value = 0.25
-      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.1
-      const lg = ctx.createGain(); lg.gain.value = 0.15
-      lfo.connect(lg).connect(g2.gain); lfo.start()
-      osc2.connect(g2).connect(master); osc2.start()
+      // =============================================================
+      // 弦乐声部（主）
+      // =============================================================
 
-      // 3) 高频泛音 (440Hz A4, 明亮一些)
-      const osc3 = ctx.createOscillator()
-      osc3.type = 'sine'; osc3.frequency.value = 440
-      const g3 = ctx.createGain(); g3.gain.value = 0.08
-      const lfo3 = ctx.createOscillator(); lfo3.frequency.value = 0.05
-      const lg3 = ctx.createGain(); lg3.gain.value = 0.06
-      lfo3.connect(lg3).connect(g3.gain); lfo3.start()
-      osc3.connect(g3).connect(master); osc3.start()
+      // === 弦乐低音：sine 波模拟大提琴持续根音 ===
+      const bassNotes = [65.41, 110.00, 87.31, 98.00, 110.00, 98.00]
+      const bass = ctx.createOscillator()
+      bass.type = 'sine'
+      const bassG = ctx.createGain()
+      bassG.gain.value = 0.12
+      bass.connect(bassG).connect(master)
+      bass.connect(bassG).connect(delay)
+      bass.start()
+      let bassIdx = 0
+      const bassTimer = setInterval(() => {
+        bassIdx = (bassIdx + 1) % bassNotes.length
+        bass.frequency.setTargetAtTime(bassNotes[bassIdx], ctx.currentTime + 0.1, 0.6)
+      }, 10000)
+      spaceAudio._timers.push(bassTimer)
 
-      // 4) 滤波噪声 (太空风声, 手机喇叭能听见)
-      const bufLen = ctx.sampleRate * 3
-      const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate)
-      const data = buf.getChannelData(0)
-      for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1) * 0.4
-      const noise = ctx.createBufferSource()
-      noise.buffer = buf; noise.loop = true
-      const filter = ctx.createBiquadFilter()
-      filter.type = 'bandpass'; filter.frequency.value = 300; filter.Q.value = 1.5
-      const ng = ctx.createGain(); ng.gain.value = 0.15
-      noise.connect(filter).connect(ng).connect(master); noise.start()
+      // === 弦乐和弦 Pad：三角波多组微 detune 模拟弦乐群 ===
+      // Cmaj9 → Am9 → Cmaj9 → Fmaj9 → Am9 → Gsus4
+      const chordDefs = [
+        [261.63, 329.63, 392.00, 440.00],  // Cmaj9
+        [220.00, 261.63, 329.63, 392.00],  // Am9
+        [261.63, 329.63, 392.00, 440.00],  // Cmaj9
+        [174.61, 220.00, 261.63, 329.63],  // Fmaj9
+        [220.00, 261.63, 329.63, 392.00],  // Am9
+        [196.00, 246.94, 293.66, 392.00],  // Gsus4
+      ]
+
+      const padList = []
+      chordDefs.forEach((notes) => {
+        const voices = []
+        notes.forEach(freq => {
+          // 3 个三角波微 detune = 弦乐群音色
+          [-12, 0, 12].forEach(det => {
+            const o = ctx.createOscillator()
+            o.type = 'triangle'
+            o.frequency.value = freq
+            o.detune.value = det
+            const g = ctx.createGain()
+            g.gain.value = 0.001
+            o.connect(g).connect(master)
+            o.connect(g).connect(delay)
+            o.start()
+            voices.push(g)
+          })
+        })
+        padList.push(voices)
+      })
+
+      const padVol = 0.022  // 每个振荡器
+      padList[0].forEach(g => { g.gain.value = padVol })
+
+      let chordIdx = 0
+      const chordTimer = setInterval(() => {
+        const next = (chordIdx + 1) % chordDefs.length
+        const t = ctx.currentTime + 0.05
+        padList[chordIdx].forEach(g => g.gain.setTargetAtTime(0.001, t, 1.5))
+        padList[next].forEach(g => g.gain.setTargetAtTime(padVol, t, 1.5))
+        chordIdx = next
+      }, 10000)
+      spaceAudio._timers.push(chordTimer)
+
+      // === 弦乐主旋律：三角波，温柔带有轻微颤音质感 ===
+      // C 大调五声音阶，缓慢悠扬的旋律线
+      const melodyNotes = [
+        523.25, 659.25, 587.33, 783.99,
+        659.25, 880.00, 783.99, 1046.50,
+        880.00, 783.99, 659.25, 587.33,
+        523.25, 440.00, 392.00, 523.25,
+      ]
+      const melOsc = ctx.createOscillator()
+      melOsc.type = 'triangle'
+      const melG = ctx.createGain()
+      melG.gain.value = 0.001
+      melOsc.connect(melG).connect(master)
+      melOsc.connect(melG).connect(delay)
+      melOsc.start()
+
+      let melIdx = 0
+      const melTimer = setInterval(() => {
+        melIdx = (melIdx + 1) % melodyNotes.length
+        const now = ctx.currentTime
+        // 缓慢淡出 → 切换音高 → 缓入（模拟弦乐运弓换音）
+        melG.gain.setTargetAtTime(0.001, now, 0.1)
+        melOsc.frequency.setTargetAtTime(melodyNotes[melIdx], now + 0.15, 0.04)
+        melG.gain.setTargetAtTime(0.1, now + 0.2, 0.5)
+      }, 2400)
+      spaceAudio._timers.push(melTimer)
+
+      // =============================================================
+      // 电子声部（辅）
+      // =============================================================
+
+      // === 电子琶音：正弦波，轻柔点缀 ===
+      const elecNotes = [783.99, 880.00, 1046.50, 1174.66, 1046.50, 880.00, 783.99, 659.25]
+      const elecOsc = ctx.createOscillator()
+      elecOsc.type = 'sine'
+      const elecG = ctx.createGain()
+      elecG.gain.value = 0.001
+      elecOsc.connect(elecG).connect(master)
+      elecOsc.connect(elecG).connect(delay)
+      elecOsc.start()
+
+      let elecIdx = 0
+      const elecTimer = setInterval(() => {
+        elecIdx = (elecIdx + 1) % elecNotes.length
+        const now = ctx.currentTime
+        elecG.gain.setTargetAtTime(0.001, now, 0.1)
+        elecOsc.frequency.setTargetAtTime(elecNotes[elecIdx], now + 0.15, 0.04)
+        elecG.gain.setTargetAtTime(0.025, now + 0.2, 0.5)
+      }, 2800)
+      spaceAudio._timers.push(elecTimer)
+
+      // === 太空底噪（极轻的低频风声） ===
+      const noiseLen = ctx.sampleRate * 2
+      const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate)
+      const noiseData = noiseBuf.getChannelData(0)
+      for (let i = 0; i < noiseLen; i++) noiseData[i] = (Math.random() * 2 - 1) * 0.15
+      const noiseSrc = ctx.createBufferSource()
+      noiseSrc.buffer = noiseBuf; noiseSrc.loop = true
+      const noiseFlt = ctx.createBiquadFilter()
+      noiseFlt.type = 'lowpass'; noiseFlt.frequency.value = 150; noiseFlt.Q.value = 0.5
+      const noiseG = ctx.createGain(); noiseG.gain.value = 0.02
+      noiseSrc.connect(noiseFlt).connect(noiseG).connect(master)
+      noiseSrc.start()
     } catch (e) {
       console.error('initSpaceAmbient error:', e)
       showToast('音频初始化失败', 'failure')
@@ -2741,8 +2846,6 @@ async function init() {
       spaceAudio.suspend().catch(e => console.error('AudioContext suspend error:', e))
     }
   }
-
-  if (btnMusic) {
     btnMusic.addEventListener('click', () => {
       if (window._musicPlaying) {
         stopMusic()
