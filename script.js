@@ -1688,54 +1688,83 @@ function observeCards() {
 function handleSplashEnter() {
   if (window._splashEntering) return
   window._splashEntering = true
-  const splash = document.getElementById('splashScreen')
-  const content = splash.querySelector('.splash-content')
-  const loading = document.getElementById('splashLoading')
-  const ringFill = document.getElementById('ringFill')
-  const percentEl = document.getElementById('loadingPercent')
 
-  const circumference = 326.7
-  const duration = 1200
-  const startTime = performance.now()
+  // 安全兜底：3秒后无论动画是否完成都进入
+  const safetyTimer = setTimeout(() => {
+    forceEnterSite()
+  }, 3000)
 
-  content.style.transition = 'opacity 0.2s ease'
-  content.style.opacity = '0'
+  function forceEnterSite() {
+    clearTimeout(safetyTimer)
+    const splash = document.getElementById('splashScreen')
+    const loading = document.getElementById('splashLoading')
+    if (loading) {
+      loading.classList.remove('active')
+      loading.style.display = 'none'
+    }
+    if (splash) {
+      splash.classList.add('hidden')
+      setTimeout(() => { splash.style.display = 'none' }, 400)
+    }
+    document.body.classList.add('reveal')
+    setTimeout(() => { openAbout() }, 300)
+  }
 
-  setTimeout(() => {
-    content.style.display = 'none'
-    loading.classList.add('active')
-  }, 200)
+  try {
+    const splash = document.getElementById('splashScreen')
+    if (!splash) return forceEnterSite()
+    const content = splash.querySelector('.splash-content')
+    const loading = document.getElementById('splashLoading')
+    const ringFill = document.getElementById('ringFill')
+    const percentEl = document.getElementById('loadingPercent')
 
-  function animateProgress(currentTime) {
-    const elapsed = currentTime - startTime - 200
-    const progress = Math.min(elapsed / duration, 1)
-    const eased = 1 - Math.pow(1 - progress, 3)
-    const percent = Math.round(eased * 100)
-    const offset = circumference - (eased * circumference)
+    const circumference = 326.7
+    const duration = 1200
+    const startTime = performance.now()
 
-    ringFill.style.strokeDashoffset = offset
-    percentEl.textContent = `${percent}%`
+    if (content) {
+      content.style.transition = 'opacity 0.2s ease'
+      content.style.opacity = '0'
+    }
 
-    if (percent >= 100) {
-      percentEl.textContent = '100%'
-      ringFill.style.strokeDashoffset = '0'
+    setTimeout(() => {
+      if (content) content.style.display = 'none'
+      if (loading) loading.classList.add('active')
+    }, 200)
 
-      setTimeout(() => {
-        loading.classList.remove('active')
-        splash.classList.add('hidden')
+    function animateProgress(currentTime) {
+      const elapsed = currentTime - startTime - 200
+      const progress = Math.min(elapsed / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      const percent = Math.round(eased * 100)
+      const offset = circumference - (eased * circumference)
+
+      if (ringFill) ringFill.style.strokeDashoffset = offset
+      if (percentEl) percentEl.textContent = `${percent}%`
+
+      if (percent >= 100) {
+        if (percentEl) percentEl.textContent = '100%'
+        if (ringFill) ringFill.style.strokeDashoffset = '0'
+
         setTimeout(() => {
-          splash.style.display = 'none'
+          if (loading) loading.classList.remove('active')
+          if (splash) {
+            splash.classList.add('hidden')
+            setTimeout(() => { splash.style.display = 'none' }, 400)
+          }
           document.body.classList.add('reveal')
-          setTimeout(() => {
-            openAbout()
-          }, 300)
-        }, 400)
-      }, 200)
-      return
+          setTimeout(() => { openAbout() }, 300)
+        }, 200)
+        clearTimeout(safetyTimer)
+        return
+      }
+      requestAnimationFrame(animateProgress)
     }
     requestAnimationFrame(animateProgress)
+  } catch (e) {
+    console.error('splash enter error:', e)
+    forceEnterSite()
   }
-  requestAnimationFrame(animateProgress)
 }
 
 function getUserAvatar(userId) {
