@@ -2151,6 +2151,7 @@ async function openUserProfile(userId) {
 
 function openChat(friendId) {
   if (!currentUser) { showToast('请先登录', 'failure'); return }
+  if (!sb) { showToast('服务器未连接', 'failure'); return }
   const friend = friendList.find(f => f.profile.id === friendId)
   const profile = friend ? friend.profile : (allProfiles && allProfiles.length > 0 ? allProfiles.find(p => p.id === friendId) : null)
   const chatTitle = document.getElementById('chatTitle')
@@ -2172,6 +2173,7 @@ function closeChat() {
 }
 
 async function loadMessages(friendId) {
+  if (!sb) { document.getElementById('chatMessages').innerHTML = '<div class="chat-empty">服务器未连接</div>'; return }
   try {
     const { data, error } = await sb
       .from('messages')
@@ -2187,7 +2189,7 @@ async function loadMessages(friendId) {
     renderChatMessages()
   } catch (e) {
     console.error('loadMessages error:', e)
-    document.getElementById('chatMessages').innerHTML = '<div class="chat-empty">加载消息失败</div>'
+    document.getElementById('chatMessages').innerHTML = '<div class="chat-empty">加载消息失败：' + (e.message || '未知错误') + '</div>'
   }
 }
 
@@ -2221,26 +2223,40 @@ function renderChatMessages() {
 
 async function sendMessage() {
   if (!chatPeerId || !currentUser) return
+  if (!sb) { showToast('服务器未连接', 'failure'); return }
   const input = document.getElementById('chatTextInput')
   const content = input.value.trim()
   if (!content) return
 
+  // 乐观更新：立即显示消息
+  const tempId = 'tmp-' + Date.now()
+  const tempMsg = {
+    id: tempId,
+    sender_id: currentUser,
+    receiver_id: chatPeerId,
+    content: content,
+    type: 'text',
+    image_url: null,
+    created_at: new Date().toISOString()
+  }
+  chatMessages.push(tempMsg)
+  renderChatMessages()
+
   input.value = ''
   input.style.height = 'auto'
 
-  try {
-    const { error } = await sb.from('messages').insert({
-      sender_id: currentUser,
-      receiver_id: chatPeerId,
-      content: content,
-      type: 'text',
-      created_at: new Date().toISOString()
-    })
-    if (error) throw error
+  const { error } = await sb.from('messages').insert({
+    sender_id: currentUser,
+    receiver_id: chatPeerId,
+    content: content,
+    type: 'text',
+    created_at: new Date().toISOString()
+  })
 
-    const { data: newMsg } = await sb.from('messages').select('*').order('created_at', { ascending: false }).limit(1).eq('sender_id', currentUser).single()
-    if (newMsg) { chatMessages.push(newMsg); renderChatMessages() }
-  } catch (e) {
+  if (error) {
+    // 回滚
+    chatMessages = chatMessages.filter(m => m.id !== tempId)
+    renderChatMessages()
     showToast('发送失败', 'failure')
     input.value = content
   }
@@ -2248,17 +2264,34 @@ async function sendMessage() {
 
 async function sendImageMessage(imageUrl) {
   if (!chatPeerId || !currentUser) return
-  try {
-    const { error } = await sb.from('messages').insert({
-      sender_id: currentUser,
-      receiver_id: chatPeerId,
-      content: '',
-      type: 'image',
-      image_url: imageUrl,
-      created_at: new Date().toISOString()
-    })
-    if (error) throw error
-  } catch (e) {
+  if (!sb) { showToast('服务器未连接', 'failure'); return }
+
+  // 乐观更新：立即显示图片消息
+  const tempId = 'tmp-img-' + Date.now()
+  const tempMsg = {
+    id: tempId,
+    sender_id: currentUser,
+    receiver_id: chatPeerId,
+    content: '',
+    type: 'image',
+    image_url: imageUrl,
+    created_at: new Date().toISOString()
+  }
+  chatMessages.push(tempMsg)
+  renderChatMessages()
+
+  const { error } = await sb.from('messages').insert({
+    sender_id: currentUser,
+    receiver_id: chatPeerId,
+    content: '',
+    type: 'image',
+    image_url: imageUrl,
+    created_at: new Date().toISOString()
+  })
+
+  if (error) {
+    chatMessages = chatMessages.filter(m => m.id !== tempId)
+    renderChatMessages()
     showToast('发送图片失败', 'failure')
   }
 }
