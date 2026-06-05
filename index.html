@@ -19,8 +19,8 @@
 /* ── critical: mobile splash overrides ── */
 @media(max-width:599px){.splash-grid,.splash-scanline,.splash-hologram,.splash-badge,.splash-ring,.splash-ring::before,.splash-ring::after,.splash-blink{animation:none!important}.splash-content{animation-duration:.01ms!important}#stars{background:transparent;animation:none;transform:none}#stars::after{top:0;left:0;width:1px;height:1px;box-shadow:30px 80px 0 0 rgba(255,255,255,.3),100px 200px 0 0 rgba(255,255,255,.2),60px 40px 0 0 rgba(255,255,255,.4),220px 120px 0 0 rgba(255,255,255,.15),50px 180px 0 0 rgba(255,255,255,.2);width:100%;height:100%}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
-  <link rel="preload" href="style.css" as="style" onload="this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="style.css"></noscript>
+  <link rel="preload" href="style.css?v=18" as="style" onload="this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="style.css?v=18"></noscript>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" async></script>
 </head>
@@ -106,7 +106,7 @@
           </div>
           <form id="publishForm" autocomplete="off">
             <div class="form-group">
-              <input type="text" id="ideaTitle" class="form-input" placeholder="给你的灵感取个名字…" maxlength="100" required>
+              <input type="text" id="ideaTitle" name="ideaTitle" class="form-input" placeholder="给你的灵感取个名字…" maxlength="100" required>
             </div>
             <div class="form-group">
               <div id="ideaContent" class="form-textarea editor-div" contenteditable="true" data-placeholder="写下你的科幻想法…&#10;支持 Markdown 格式&#10;图片: 点击下方 📷 按钮上传"></div>
@@ -114,11 +114,11 @@
             <div class="form-row form-tools">
               <div class="form-tools-left">
                 <div class="form-tags-group">
-                  <input type="text" id="ideaTags" class="form-input tag-input" placeholder="标签（用逗号分隔）" maxlength="100">
+                  <input type="text" id="ideaTags" name="ideaTags" class="form-input tag-input" placeholder="标签（用逗号分隔）" maxlength="100">
                 </div>
               </div>
               <div class="form-tools-right">
-                <input type="file" id="imageUpload" accept="image/*" style="display:none">
+                <input type="file" id="imageUpload" name="imageUpload" accept="image/*" style="display:none">
                 <button type="button" class="btn btn-upload-img" id="btnUploadImage" title="上传图片">
                   <span class="btn-icon">📷</span> 图片
                 </button>
@@ -126,15 +126,15 @@
             </div>
             <div class="form-row">
               <div class="category-selector">
-                <button type="button" class="cat-option active" data-value="idea">
+                <button type="button" class="cat-option active" data-value="idea" aria-pressed="true">
                   <span class="cat-dot idea-dot"></span>
                   科幻点子
                 </button>
-                <button type="button" class="cat-option" data-value="concept">
+                <button type="button" class="cat-option" data-value="concept" aria-pressed="false">
                   <span class="cat-dot concept-dot"></span>
                   科幻概念
                 </button>
-                <button type="button" class="cat-option" data-value="essay">
+                <button type="button" class="cat-option" data-value="essay" aria-pressed="false">
                   <span class="cat-dot essay-dot"></span>
                   科幻随笔
                 </button>
@@ -171,7 +171,7 @@
             <span class="filter-dot fav-dot"></span>
             ★ 收藏
           </button>
-          <span class="filter-separator"></span>
+          <span class="filter-separator" aria-hidden="true"></span>
           <button class="filter-btn filter-news-btn" data-filter="news">
             <span class="filter-dot news-dot"></span>
             星际资讯
@@ -180,7 +180,7 @@
         <div class="search-sort-row" id="searchSortRow">
           <div class="search-box">
             <span class="search-icon">⌕</span>
-            <input type="text" id="searchInput" class="search-input" placeholder="搜索内容…">
+            <input type="text" id="searchInput" name="searchInput" class="search-input" placeholder="搜索内容…" autocomplete="off">
           </div>
           <div class="sort-controls">
             <button class="sort-btn active" data-sort="time">时间</button>
@@ -241,29 +241,29 @@
           <span class="modal-icon">⟐</span>
           注册账号
         </h2>
-        <button class="modal-close" id="btnCloseRegister">✕</button>
+        <button class="modal-close" id="btnCloseRegister" aria-label="关闭">✕</button>
       </div>
       <form id="registerForm" autocomplete="off">
         <div class="form-group">
-          <label class="form-label">邮箱地址</label>
-          <input type="email" id="regAccount" class="form-input modal-input" placeholder="输入邮箱地址" required>
+          <label class="form-label" for="regAccount">邮箱地址</label>
+          <input type="email" id="regAccount" name="regAccount" class="form-input modal-input" placeholder="输入邮箱地址" required autocomplete="email" spellcheck="false">
         </div>
         <div class="form-group">
-          <label class="form-label">探测员昵称</label>
+          <label class="form-label" for="regNickname">探测员昵称</label>
           <div class="nickname-row">
-            <input type="text" id="regNickname" class="form-input modal-input nickname-input" placeholder="给自己取个代号" maxlength="15" required>
+            <input type="text" id="regNickname" name="regNickname" class="form-input modal-input nickname-input" placeholder="给自己取个代号" maxlength="15" required autocomplete="name">
             <button type="button" class="btn btn-random" id="btnRandomNickname">⟳ 随机</button>
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">设置密码</label>
-          <input type="password" id="regPassword" class="form-input modal-input" placeholder="至少 6 位密码" minlength="6" required>
+          <label class="form-label" for="regPassword">设置密码</label>
+          <input type="password" id="regPassword" name="regPassword" class="form-input modal-input" placeholder="至少 6 位密码" minlength="6" required autocomplete="new-password">
         </div>
         <div class="form-group">
-          <label class="form-label">确认密码</label>
-          <input type="password" id="regConfirm" class="form-input modal-input" placeholder="再次输入密码" minlength="6" required>
+          <label class="form-label" for="regConfirm">确认密码</label>
+          <input type="password" id="regConfirm" name="regConfirm" class="form-input modal-input" placeholder="再次输入密码" minlength="6" required autocomplete="new-password">
         </div>
-        <button type="submit" class="modal-submit btn-glow" style="width:100%;justify-content:center">
+        <button type="submit" class="modal-submit btn-glow" id="btnRegisterSubmit" style="width:100%;justify-content:center">
           ✦ 注册
         </button>
         <p class="modal-switch">
@@ -280,16 +280,16 @@
           <span class="modal-icon">⟐</span>
           登录账号
         </h2>
-        <button class="modal-close" id="btnCloseLogin">✕</button>
+        <button class="modal-close" id="btnCloseLogin" aria-label="关闭">✕</button>
       </div>
       <form id="loginForm" autocomplete="off">
         <div class="form-group">
-          <label class="form-label">邮箱地址</label>
-          <input type="email" id="loginAccount" class="form-input modal-input" placeholder="输入注册时使用的邮箱" required>
+          <label class="form-label" for="loginAccount">邮箱地址</label>
+          <input type="email" id="loginAccount" name="loginAccount" class="form-input modal-input" placeholder="输入注册时使用的邮箱" required autocomplete="email" spellcheck="false">
         </div>
         <div class="form-group">
-          <label class="form-label">密码</label>
-          <input type="password" id="loginPassword" class="form-input modal-input" placeholder="输入密码" required>
+          <label class="form-label" for="loginPassword">密码</label>
+          <input type="password" id="loginPassword" name="loginPassword" class="form-input modal-input" placeholder="输入密码" required autocomplete="current-password">
         </div>
         <button type="submit" class="modal-submit btn-glow" style="width:100%;justify-content:center">
           ✦ 登录
@@ -310,15 +310,15 @@
           <span class="modal-icon">⟐</span>
           编辑内容
         </h2>
-        <button class="modal-close" id="btnCloseEdit">✕</button>
+        <button class="modal-close" id="btnCloseEdit" aria-label="关闭">✕</button>
       </div>
       <form id="editForm" autocomplete="off">
         <div class="form-group">
-          <label class="form-label">标题</label>
-          <input type="text" id="editTitle" class="form-input modal-input" maxlength="100" required>
+          <label class="form-label" for="editTitle">标题</label>
+          <input type="text" id="editTitle" name="editTitle" class="form-input modal-input" maxlength="100" required>
         </div>
         <div class="form-group">
-          <label class="form-label">正文</label>
+          <label class="form-label" for="editContent">正文</label>
           <div id="editContent" class="form-textarea editor-div" contenteditable="true" data-placeholder="编辑内容…" style="min-height:120px"></div>
           <div class="form-row form-tools" style="margin-top:6px">
             <div class="form-tools-left"></div>
@@ -330,21 +330,21 @@
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">标签（用逗号分隔）</label>
-          <input type="text" id="editTags" class="form-input modal-input" placeholder="标签1, 标签2" maxlength="100">
+          <label class="form-label" for="editTags">标签（用逗号分隔）</label>
+          <input type="text" id="editTags" name="editTags" class="form-input modal-input" placeholder="标签1, 标签2" maxlength="100">
         </div>
         <div class="form-group">
-          <label class="form-label">分类</label>
-          <div class="category-selector" id="editCategorySelector">
-            <button type="button" class="cat-option" data-value="idea">
+          <span class="form-label" id="editCategoryLabel">分类</span>
+          <div class="category-selector" id="editCategorySelector" role="radiogroup" aria-labelledby="editCategoryLabel">
+            <button type="button" class="cat-option" data-value="idea" aria-pressed="false">
               <span class="cat-dot idea-dot"></span>
               科幻点子
             </button>
-            <button type="button" class="cat-option" data-value="concept">
+            <button type="button" class="cat-option" data-value="concept" aria-pressed="false">
               <span class="cat-dot concept-dot"></span>
               科幻概念
             </button>
-            <button type="button" class="cat-option" data-value="essay">
+            <button type="button" class="cat-option" data-value="essay" aria-pressed="false">
               <span class="cat-dot essay-dot"></span>
               科幻随笔
             </button>
@@ -375,7 +375,7 @@
           <span class="modal-icon">✦</span>
           关于蛮林世界
         </h2>
-        <button class="modal-close" id="btnCloseAbout">✕</button>
+        <button class="modal-close" id="btnCloseAbout" aria-label="关闭">✕</button>
       </div>
       <div class="about-body">
         <div class="about-hero">
@@ -460,7 +460,7 @@
           <span class="modal-icon">⟐</span>
           探测员档案
         </h2>
-        <button class="modal-close" id="btnCloseProfile">✕</button>
+        <button class="modal-close" id="btnCloseProfile" aria-label="关闭">✕</button>
       </div>
       <div class="profile-body" id="profileBody">
         <div class="profile-header">
@@ -516,7 +516,7 @@
           <span class="modal-icon">✦</span>
           探测员资料
         </h2>
-        <button class="modal-close" id="btnCloseUserInfo">✕</button>
+        <button class="modal-close" id="btnCloseUserInfo" aria-label="关闭">✕</button>
       </div>
       <div class="profile-body">
         <div class="profile-header">
@@ -552,15 +552,15 @@
           <span class="modal-icon">⟐</span>
           修改信息
         </h2>
-        <button class="modal-close" id="btnCloseSettings">✕</button>
+        <button class="modal-close" id="btnCloseSettings" aria-label="关闭">✕</button>
       </div>
       <form id="settingsForm" autocomplete="off">
         <div class="settings-avatar-section">
-          <label class="form-label">探测员头像</label>
+          <span class="form-label">探测员头像</span>
           <div class="settings-avatar-row">
-            <img class="settings-avatar-preview" id="settingsAvatarPreview" src="" alt="头像">
+            <img class="settings-avatar-preview" id="settingsAvatarPreview" src="" alt="头像" width="56" height="56">
             <div class="settings-avatar-actions">
-              <input type="file" id="avatarUpload" accept="image/*" style="display:none">
+              <input type="file" id="avatarUpload" name="avatarUpload" accept="image/*" style="display:none">
               <button type="button" class="btn btn-random" id="btnUploadAvatar">📷 上传</button>
               <button type="button" class="btn btn-random" id="btnRandomAvatar">⟳ 随机头像</button>
             </div>
@@ -568,24 +568,24 @@
         </div>
         <div class="settings-divider"></div>
         <div class="form-group">
-          <label class="form-label">探测员昵称</label>
+          <label class="form-label" for="settingsNickname">探测员昵称</label>
           <div class="nickname-row">
-            <input type="text" id="settingsNickname" class="form-input modal-input nickname-input" maxlength="15" required>
+            <input type="text" id="settingsNickname" name="settingsNickname" class="form-input modal-input nickname-input" maxlength="15" required autocomplete="name">
             <button type="button" class="btn btn-random" id="btnRandomNicknameSettings">⟳ 随机</button>
           </div>
         </div>
         <div class="settings-divider"></div>
         <div class="form-group">
-          <label class="form-label">当前密码</label>
-          <input type="password" id="settingsCurrPwd" class="form-input modal-input" placeholder="输入当前密码">
+          <label class="form-label" for="settingsCurrPwd">当前密码</label>
+          <input type="password" id="settingsCurrPwd" name="settingsCurrPwd" class="form-input modal-input" placeholder="输入当前密码" autocomplete="current-password">
         </div>
         <div class="form-group">
-          <label class="form-label">新密码</label>
-          <input type="password" id="settingsNewPwd" class="form-input modal-input" placeholder="留空则不修改" minlength="6">
+          <label class="form-label" for="settingsNewPwd">新密码</label>
+          <input type="password" id="settingsNewPwd" name="settingsNewPwd" class="form-input modal-input" placeholder="留空则不修改" minlength="6" autocomplete="new-password">
         </div>
         <div class="form-group">
-          <label class="form-label">确认新密码</label>
-          <input type="password" id="settingsConfirmPwd" class="form-input modal-input" placeholder="再次输入新密码" minlength="6">
+          <label class="form-label" for="settingsConfirmPwd">确认新密码</label>
+          <input type="password" id="settingsConfirmPwd" name="settingsConfirmPwd" class="form-input modal-input" placeholder="再次输入新密码" minlength="6" autocomplete="new-password">
         </div>
         <button type="submit" class="modal-submit btn-glow" style="width:100%;justify-content:center">
           ✦ 保存设置
@@ -601,12 +601,12 @@
           <span class="modal-icon">⟐</span>
           编辑头像
         </h2>
-        <button class="modal-close" id="btnCloseCrop">✕</button>
+        <button class="modal-close" id="btnCloseCrop" aria-label="关闭">✕</button>
       </div>
       <div class="crop-body">
         <div class="crop-viewport" id="cropViewport">
           <div class="crop-image-wrap" id="cropImageWrap">
-            <img id="cropImage" src="" alt="裁剪头像" draggable="false">
+            <img id="cropImage" src="" alt="裁剪头像" draggable="false" width="300" height="300">
           </div>
           <div class="crop-frame"></div>
         </div>
@@ -629,7 +629,7 @@
     <div class="modal-card detail-card">
       <div class="modal-header">
         <h2 class="modal-title" id="detailModalTitle">⟡ 全文</h2>
-        <button class="modal-close" id="btnCloseDetail">✕</button>
+        <button class="modal-close" id="btnCloseDetail" aria-label="关闭">✕</button>
       </div>
       <div class="detail-body" id="detailBody"></div>
     </div>
@@ -639,11 +639,11 @@
     <div class="modal-card friend-card">
       <div class="modal-header">
         <h2 class="modal-title">👥 好友</h2>
-        <button class="modal-close" id="btnCloseFriends">✕</button>
+        <button class="modal-close" id="btnCloseFriends" aria-label="关闭">✕</button>
       </div>
       <div class="friend-body">
         <div class="friend-search-box">
-          <input type="text" class="form-input" id="friendSearchInput" placeholder="通过邮箱或昵称搜索用户…" maxlength="100">
+          <input type="text" class="form-input" id="friendSearchInput" name="friendSearchInput" placeholder="通过邮箱或昵称搜索用户…" maxlength="100" autocomplete="off">
           <button class="btn btn-glow btn-sm" id="btnFriendSearch">搜索</button>
         </div>
         <div class="friend-search-results" id="friendSearchResults" style="display:none">
@@ -667,7 +667,7 @@
     <div class="modal-card profile-card">
       <div class="modal-header">
         <h2 class="modal-title" id="profileModalTitle">✦ 探测员档案</h2>
-        <button class="modal-close" id="btnCloseUserProfile">✕</button>
+        <button class="modal-close" id="btnCloseUserProfile" aria-label="关闭">✕</button>
       </div>
       <div class="profile-body" id="userProfileBody"></div>
     </div>
@@ -684,9 +684,9 @@
           <div class="chat-empty">选择一位好友开始对话</div>
         </div>
         <div class="chat-input-area" id="chatInputArea">
-          <input type="file" id="chatImageInput" accept="image/*" style="display:none">
+          <input type="file" id="chatImageInput" name="chatImageInput" accept="image/*" style="display:none">
           <button class="chat-btn-img" id="btnChatImage" aria-label="发送图片">🖼</button>
-          <textarea class="chat-textarea" id="chatTextInput" placeholder="输入消息…" rows="1" maxlength="2000" aria-label="消息输入"></textarea>
+          <textarea class="chat-textarea" id="chatTextInput" name="chatTextInput" placeholder="输入消息…" rows="1" maxlength="2000" aria-label="消息输入"></textarea>
           <button class="chat-btn-send" id="btnChatSend">发送</button>
         </div>
       </div>
@@ -705,6 +705,6 @@
 
   <!-- bgAudio replaced by Web Audio API space ambient -->
 
-  <script src="script.js?v=17" defer></script>
+  <script src="script.js?v=18" defer></script>
 </body>
 </html>

@@ -126,19 +126,23 @@ async function loadIdeas() {
 
   const ideaIds = ideasData.map(i => i.id)
 
-  const { data: commentsData } = await sb
+  const { data: commentsData, error: commentsError } = await sb
     .from('comments')
     .select('*')
     .in('idea_id', ideaIds)
     .order('created_at', { ascending: true })
 
+  if (commentsError) console.error('loadIdeas comments error:', commentsError)
+
   const commentIds = (commentsData || []).map(c => c.id)
 
-  const { data: repliesData } = await sb
+  const { data: repliesData, error: repliesError } = await sb
     .from('replies')
     .select('*')
     .in('comment_id', commentIds)
     .order('created_at', { ascending: true })
+
+  if (repliesError) console.error('loadIdeas replies error:', repliesError)
 
   const commentsByIdea = {}
   ;(commentsData || []).forEach(c => {
@@ -159,10 +163,11 @@ async function loadIdeas() {
 
   let profilesMap = {}
   if (userIds.size > 0) {
-    const { data: profilesData } = await sb
+    const { data: profilesData, error: profilesError } = await sb
       .from('profiles')
       .select('*')
       .in('id', Array.from(userIds))
+    if (profilesError) console.error('loadIdeas profiles error:', profilesError)
     if (profilesData) {
       profilesData.forEach(p => { profilesMap[p.id] = p })
     }
@@ -426,6 +431,7 @@ async function handleLike(id) {
     .update({ likes: newLikes, liked_by: newLikedBy })
     .eq('id', id)
     .then(({ error }) => { if (error) { idea.likedBy = prevLikedBy; idea.likes = prevLikes; renderIdeas() } })
+    .catch(e => { console.error('handleLike update error:', e); idea.likedBy = prevLikedBy; idea.likes = prevLikes; renderIdeas() })
 
   if (wasNotLiked) {
     const btn = document.querySelector(`[data-action="like"][data-id="${id}"]`)
@@ -445,11 +451,15 @@ async function toggleComments(id) {
     const idea = ideas.find(item => item.id === id)
     if (idea) {
       const newViews = (idea.views || 0) + 1
-      await sb
+      const { error: viewsError } = await sb
         .from('ideas')
         .update({ views: newViews })
         .eq('id', id)
-      idea.views = newViews
+      if (!viewsError) {
+        idea.views = newViews
+      } else {
+        console.error('toggleComments views error:', viewsError)
+      }
       const viewEl = document.querySelector(`[data-id="${id}"] .card-view-count`)
       if (viewEl) viewEl.textContent = idea.views
     }
@@ -559,6 +569,7 @@ async function handleSubmitComment(id) {
       }
       renderIdeas()
     })
+    .catch(e => { console.error('handleSubmitComment error:', e); showToast('评论发送失败', 'failure'); reloadIdeasBg() })
 }
 
 async function handleCommentLike(ideaId, commentId) {
@@ -583,10 +594,11 @@ async function handleCommentLike(ideaId, commentId) {
     newLikedBy.push(currentUser)
     newLikes = (comment.likes || 0) + 1
   }
-  await sb
+  const { error: cmtLikeError } = await sb
     .from('comments')
     .update({ likes: newLikes, liked_by: newLikedBy })
     .eq('id', commentId)
+  if (cmtLikeError) { console.error('handleCommentLike error:', cmtLikeError); return }
   comment.likedBy = newLikedBy
   comment.likes = newLikes
   renderIdeas()
@@ -623,10 +635,11 @@ async function handleReplyLike(ideaId, commentId, replyId) {
     newLikedBy.push(currentUser)
     newLikes = (reply.likes || 0) + 1
   }
-  await sb
+  const { error: replyLikeError } = await sb
     .from('replies')
     .update({ likes: newLikes, liked_by: newLikedBy })
     .eq('id', replyId)
+  if (replyLikeError) { console.error('handleReplyLike error:', replyLikeError); return }
   reply.likedBy = newLikedBy
   reply.likes = newLikes
   renderIdeas()
@@ -711,17 +724,19 @@ async function handleFavorite(id) {
   const idx = currentUserProfile.favorites.indexOf(id)
   if (idx > -1) {
     currentUserProfile.favorites.splice(idx, 1)
-    await sb
+    const { error: unfavError } = await sb
       .from('profiles')
       .update({ favorites: currentUserProfile.favorites })
       .eq('id', currentUser)
+    if (unfavError) { console.error('handleFavorite remove error:', unfavError); return }
     showToast('已取消收藏', 'failure')
   } else {
     currentUserProfile.favorites.push(id)
-    await sb
+    const { error: favError } = await sb
       .from('profiles')
       .update({ favorites: currentUserProfile.favorites })
       .eq('id', currentUser)
+    if (favError) { console.error('handleFavorite add error:', favError); return }
     showToast('已收藏', 'success')
   }
   renderIdeas()
@@ -799,6 +814,7 @@ function setSort(sort) {
 async function fetchNews() {
   const grid = document.getElementById('newsGrid')
   const countEl = document.getElementById('newsCount')
+  if (!grid || !countEl) return
   countEl.textContent = '接收中…'
   grid.innerHTML = `
     <div class="empty-state">
@@ -855,6 +871,7 @@ async function refreshNews() {
   const grid = document.getElementById('newsGrid')
   const countEl = document.getElementById('newsCount')
   const paginationEl = document.getElementById('newsPagination')
+  if (!grid || !countEl) return
   paginationEl.innerHTML = ''
   countEl.textContent = '刷新中…'
   grid.innerHTML = `
@@ -899,6 +916,8 @@ function renderNews(articles) {
   const grid = document.getElementById('newsGrid')
   const countEl = document.getElementById('newsCount')
   const paginationEl = document.getElementById('newsPagination')
+
+  if (!grid || !countEl) return
 
   if (!articles || articles.length === 0) {
     grid.innerHTML = `
@@ -1030,6 +1049,7 @@ function renderPagination(totalPages, container) {
 function updateTagFilterBar() {
   const bar = document.getElementById('tagFilterBar')
   const list = document.getElementById('tagFilterList')
+  if (!bar || !list) return
   const allTags = new Set()
 
   ideas.forEach(item => {
@@ -1073,16 +1093,19 @@ async function handlePublish(e) {
     return
   }
 
-  const title = document.getElementById('ideaTitle').value.trim()
+  const title = document.getElementById('ideaTitle')
   const editor = document.getElementById('ideaContent')
+  const tagsEl = document.getElementById('ideaTags')
+  if (!title || !editor || !tagsEl) return
+  const titleVal = title.value.trim()
   const content = editor.innerHTML.trim()
-  if (!title || !content || content === '<br>' || content === '<div><br></div>') return
+  if (!titleVal || !content || content === '<br>' || content === '<div><br></div>') return
 
   const activeCat = document.querySelector('#publishForm .cat-option.active')
   const category = activeCat ? activeCat.dataset.value : 'idea'
 
   const nickname = currentUserProfile ? currentUserProfile.nickname : '匿名探测员'
-  const tagsRaw = document.getElementById('ideaTags').value.trim()
+  const tagsRaw = tagsEl.value.trim()
   const tags = tagsRaw
     ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean)
     : []
@@ -1090,7 +1113,7 @@ async function handlePublish(e) {
   const { data, error } = await sb
     .from('ideas')
     .insert({
-      title,
+      title: titleVal,
       content,
       category,
       tags,
@@ -1106,7 +1129,7 @@ async function handlePublish(e) {
 
   const newIdea = {
     id: data.id,
-    title,
+    title: titleVal,
     content,
     category,
     tags,
@@ -1137,14 +1160,19 @@ async function handlePublish(e) {
 async function handleEditSubmit(e) {
   e.preventDefault()
 
-  const title = document.getElementById('editTitle').value.trim()
-  const content = document.getElementById('editContent').innerHTML.trim()
+  const titleEl = document.getElementById('editTitle')
+  const contentEl = document.getElementById('editContent')
+  const tagsEl = document.getElementById('editTags')
+  if (!titleEl || !contentEl || !tagsEl) return
+
+  const title = titleEl.value.trim()
+  const content = contentEl.innerHTML.trim()
   if (!title || !content || !editingId) return
 
   const activeCat = document.querySelector('#editCategorySelector .cat-option.active')
   const category = activeCat ? activeCat.dataset.value : 'idea'
 
-  const tagsRaw = document.getElementById('editTags').value.trim()
+  const tagsRaw = tagsEl.value.trim()
   const tags = tagsRaw
     ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean)
     : []
@@ -1152,10 +1180,16 @@ async function handleEditSubmit(e) {
   const idea = ideas.find(item => item.id === editingId)
   if (!idea) return
 
-  await sb
+  const { error: editError } = await sb
     .from('ideas')
     .update({ title, content, category, tags, updated_at: new Date().toISOString() })
     .eq('id', editingId)
+
+  if (editError) {
+    console.error('handleEditSubmit error:', editError)
+    showToast('修改保存失败，请重试', 'failure')
+    return
+  }
 
   idea.title = title
   idea.content = content
@@ -1245,7 +1279,7 @@ async function confirmDelete() {
 
   sb.from('ideas').delete().eq('id', idToDelete).then(({ error }) => {
     if (error) { showToast('删除失败，请刷新页面', 'failure'); reloadIdeasBg() }
-  })
+  }).catch(e => { console.error('confirmDelete error:', e); showToast('删除失败，请刷新页面', 'failure'); reloadIdeasBg() })
 }
 
 function openPublishForm() {
@@ -1264,6 +1298,8 @@ function updateUserUI() {
   const nameEl = document.getElementById('userNameDisplay')
   const avatarEl = document.getElementById('userAvatar')
   const favBtn = document.getElementById('filterFavBtn')
+
+  if (!guest || !logged || !nameEl || !avatarEl) return
 
   if (currentUser && currentUserProfile) {
     guest.style.display = 'none'
@@ -1304,6 +1340,7 @@ function closeModal(id) {
 
 async function handleRegister(e) {
   e.preventDefault()
+  const submitBtn = document.getElementById('btnRegisterSubmit')
   const email = document.getElementById('regAccount').value.trim()
   const nickname = document.getElementById('regNickname').value.trim()
   const password = document.getElementById('regPassword').value
@@ -1326,42 +1363,50 @@ async function handleRegister(e) {
     return
   }
 
-  const nickExists = await checkNicknameExists(nickname)
-  if (nickExists) {
-    showToast('抱歉探测员，昵称已有人编写', 'failure')
-    return
-  }
+  submitBtn.disabled = true
+  submitBtn.textContent = '✦ 注册中…'
 
-  const { data, error } = await sb.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { nickname }
-    }
-  })
-
-  if (error) {
-    if (error.message.includes('already registered')) {
-      showToast('注册失败：该邮箱已被注册', 'failure')
-    } else {
-      showToast('注册失败：' + error.message, 'failure')
-    }
-    return
-  }
-
-  if (data.user) {
-    const { error: profileError } = await sb
-      .from('profiles')
-      .insert({ id: data.user.id, nickname, email, avatar: '', favorites: [] })
-    if (profileError) {
-      showToast('注册成功，但档案创建失败', 'failure')
+  try {
+    const nickExists = await checkNicknameExists(nickname)
+    if (nickExists) {
+      showToast('抱歉探测员，昵称已有人编写', 'failure')
       return
     }
-  }
 
-  showToast('注册成功', 'success')
-  closeModal('registerModal')
-  document.getElementById('registerForm').reset()
+    const { data, error } = await sb.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { nickname }
+      }
+    })
+
+    if (error) {
+      if (error.message.includes('already registered')) {
+        showToast('注册失败：该邮箱已被注册', 'failure')
+      } else {
+        showToast('注册失败：' + error.message, 'failure')
+      }
+      return
+    }
+
+    if (data.user) {
+      const { error: profileError } = await sb
+        .from('profiles')
+        .insert({ id: data.user.id, nickname, email, avatar: '', favorites: [] })
+      if (profileError) {
+        showToast('注册成功，但档案创建失败', 'failure')
+        return
+      }
+    }
+
+    showToast('注册成功', 'success')
+    closeModal('registerModal')
+    document.getElementById('registerForm').reset()
+  } finally {
+    submitBtn.disabled = false
+    submitBtn.textContent = '✦ 注册'
+  }
 }
 
 async function handleLogin(e) {
@@ -1384,20 +1429,27 @@ async function handleLogin(e) {
 
   currentUser = data.user.id
 
-  let { data: profile } = await sb
+  let { data: profile, error: loginProfileError } = await sb
     .from('profiles')
     .select('*')
     .eq('id', currentUser)
     .single()
 
+  if (loginProfileError) {
+    console.error('handleLogin profile fetch error:', loginProfileError)
+  }
+
   if (!profile) {
     const userEmail = data.user.email || ''
     const nickname = data.user.user_metadata?.nickname || userEmail.split('@')[0] || '探测员'
-    const { data: newProfile } = await sb
+    const { data: newProfile, error: loginProfileInsertError } = await sb
       .from('profiles')
       .insert({ id: currentUser, nickname, email: userEmail, avatar: '', favorites: [] })
       .select()
       .single()
+    if (loginProfileInsertError) {
+      console.error('handleLogin profile insert error:', loginProfileInsertError)
+    }
     profile = newProfile
   }
 
@@ -1428,12 +1480,16 @@ async function openProfile() {
   const totalComments = userIdeas.reduce((sum, item) => sum + (item.comments ? item.comments.length : 0), 0)
   const favCount = currentUserProfile && currentUserProfile.favorites ? currentUserProfile.favorites.length : 0
 
-  document.getElementById('profileAccount').textContent = currentUserProfile ? currentUserProfile.nickname : '探测员'
-  document.getElementById('profileJoinDate').textContent = currentUserProfile
+  const profileAccountEl = document.getElementById('profileAccount')
+  const profileJoinEl = document.getElementById('profileJoinDate')
+  const avatarEl = document.querySelector('#profileModal .profile-avatar-large')
+  if (!profileAccountEl || !profileJoinEl || !avatarEl) return
+
+  profileAccountEl.textContent = currentUserProfile ? currentUserProfile.nickname : '探测员'
+  profileJoinEl.textContent = currentUserProfile
     ? `注册于 ${formatDate(currentUserProfile.created_at)}`
     : '-'
 
-  const avatarEl = document.querySelector('#profileModal .profile-avatar-large')
   if (currentUserProfile && currentUserProfile.avatar) {
     avatarEl.innerHTML = `<img class="avatar-img" src="${currentUserProfile.avatar}" alt="">`
   } else {
@@ -1521,13 +1577,19 @@ async function handleUpdateSettings(e) {
     currentUserProfile.avatar = avatarSrc
   }
 
-  await sb
+  const { error: settingsUpdateError } = await sb
     .from('profiles')
     .update({
       nickname: currentUserProfile.nickname,
       avatar: currentUserProfile.avatar
     })
     .eq('id', currentUser)
+
+  if (settingsUpdateError) {
+    console.error('handleUpdateSettings error:', settingsUpdateError)
+    showToast('设置保存失败，请重试', 'failure')
+    return
+  }
 
   const avatarChanged = avatarSrc && avatarSrc !== oldAvatar
   if (newNickname || avatarChanged) { updateUserUI(); renderIdeas() }
@@ -1778,18 +1840,26 @@ function getUserAvatar(userId) {
 async function viewUserInfo(userId) {
   if (!userId) return
 
-  const { data: userProfile } = await sb
+  const { data: userProfile, error: viewUserError } = await sb
     .from('profiles')
     .select('*')
     .eq('id', userId)
     .single()
 
+  if (viewUserError) {
+    console.error('viewUserInfo error:', viewUserError)
+  }
+
   const userIdeas = ideas.filter(item => item.author === userId)
   const totalLikes = userIdeas.reduce((sum, item) => sum + (item.likes || 0), 0)
   const totalComments = userIdeas.reduce((sum, item) => sum + (item.comments ? item.comments.length : 0), 0)
 
-  document.getElementById('userInfoNickname').textContent = userProfile ? userProfile.nickname : '已注销'
-  document.getElementById('userInfoAccount').textContent = userId === currentUser ? (currentUserProfile ? currentUserProfile.nickname : userId) : maskAccount(userId)
+  const nickEl = document.getElementById('userInfoNickname')
+  const accountEl = document.getElementById('userInfoAccount')
+  if (!nickEl || !accountEl) return
+
+  nickEl.textContent = userProfile ? userProfile.nickname : '已注销'
+  accountEl.textContent = userId === currentUser ? (currentUserProfile ? currentUserProfile.nickname : userId) : maskAccount(userId)
   document.getElementById('userInfoJoinDate').textContent = userProfile ? `注册于 ${formatDate(userProfile.created_at)}` : '-'
   document.getElementById('userInfoStatPosts').textContent = userIdeas.length
   document.getElementById('userInfoStatLikes').textContent = totalLikes
@@ -1844,10 +1914,11 @@ const FRIEND_CACHE_TTL = 15000 // 15秒内不重复请求
 async function loadFriends() {
   if (!currentUser) { friendList = []; pendingRequests = []; return }
   try {
-    const { data: myFriendships } = await sb
+    const { data: myFriendships, error: friendsError } = await sb
       .from('friends')
       .select('*')
       .or(`user_id.eq.${currentUser},friend_id.eq.${currentUser}`)
+    if (friendsError) { console.error('loadFriends error:', friendsError); friendList = []; pendingRequests = []; return }
     if (!myFriendships) { friendList = []; pendingRequests = []; return }
 
     friendList = []
@@ -1855,11 +1926,12 @@ async function loadFriends() {
     for (const f of myFriendships) {
       const isMeUser = f.user_id === currentUser
       const otherId = isMeUser ? f.friend_id : f.user_id
-      const { data: profile } = await sb
+      const { data: profile, error: friendProfileError } = await sb
         .from('profiles')
         .select('id, nickname, avatar, email')
         .eq('id', otherId)
         .single()
+      if (friendProfileError) { console.error('loadFriends profile error:', friendProfileError); continue }
       if (!profile) continue
       if (f.status === 'accepted') {
         friendList.push({ friendshipId: f.id, profile })
@@ -1876,6 +1948,7 @@ async function loadFriends() {
 
 function renderFriends() {
   const el = document.getElementById('friendList')
+  if (!el) return
   if (friendList.length === 0) {
     el.innerHTML = '<div class="friend-empty">还没有好友，去搜索添加吧</div>'
     return
@@ -1894,6 +1967,7 @@ function renderFriends() {
 
 function renderRequests() {
   const el = document.getElementById('friendRequests')
+  if (!el) return
   if (pendingRequests.length === 0) {
     el.innerHTML = '<div class="friend-empty">暂无好友请求</div>'
     document.getElementById('reqBadge').style.display = 'none'
@@ -1931,11 +2005,17 @@ async function searchUsers(query) {
     return
   }
   try {
-    const { data: results } = await sb
+    const { data: results, error: searchError } = await sb
       .from('profiles')
       .select('id, nickname, avatar, email')
       .or(`email.ilike.%${query.trim()}%,nickname.ilike.%${query.trim()}%`)
       .limit(20)
+    
+    if (searchError) {
+      console.error('searchUsers error:', searchError)
+      showToast('搜索失败，可能他还没来过这个世界', 'failure')
+      return
+    }
     
     const searchResultsEl = document.getElementById('friendSearchResults')
     const searchListEl = document.getElementById('friendSearchList')
@@ -1961,10 +2041,11 @@ async function searchUsers(query) {
       let friendshipId = null
 
       if (currentUser) {
-        const { data: friendship } = await sb
+        const { data: friendship, error: searchFriendError } = await sb
           .from('friends')
           .select('*')
           .or(`and(user_id.eq.${currentUser},friend_id.eq.${user.id}),and(user_id.eq.${user.id},friend_id.eq.${currentUser})`)
+        if (searchFriendError) console.error('searchUsers friendship check error:', searchFriendError)
         if (friendship && friendship.length > 0) {
           const f = friendship[0]
           if (f.status === 'accepted') {
@@ -2024,10 +2105,15 @@ async function searchUsers(query) {
 async function sendFriendRequestFromSearch(friendId, btnEl) {
   if (!currentUser) { showToast('请先登录', 'failure'); return }
   try {
-    const { data: existing } = await sb
+    const { data: existing, error: existingError } = await sb
       .from('friends')
       .select('*')
       .or(`and(user_id.eq.${currentUser},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${currentUser})`)
+    if (existingError) {
+      console.error('sendFriendRequestFromSearch check error:', existingError)
+      showToast('添加好友失败', 'failure')
+      return
+    }
     if (existing && existing.length > 0) {
       showToast('已发送过好友请求或已是好友', 'failure')
       return
@@ -2036,6 +2122,7 @@ async function sendFriendRequestFromSearch(friendId, btnEl) {
       .from('friends')
       .insert({ user_id: currentUser, friend_id: friendId, status: 'pending' })
     if (error) {
+      console.error('sendFriendRequestFromSearch insert error:', error)
       showToast('添加好友失败', 'failure')
       return
     }
@@ -2050,10 +2137,15 @@ async function sendFriendRequestFromSearch(friendId, btnEl) {
 async function sendFriendRequest(friendId) {
   if (!currentUser) { showToast('请先登录', 'failure'); return }
   try {
-    const { data: existing } = await sb
+    const { data: existing, error: existingError } = await sb
       .from('friends')
       .select('*')
       .or(`and(user_id.eq.${currentUser},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${currentUser})`)
+    if (existingError) {
+      console.error('sendFriendRequest check error:', existingError)
+      showToast('添加好友失败', 'failure')
+      return
+    }
     if (existing && existing.length > 0) {
       showToast('已发送过好友请求或已是好友', 'failure')
       return
@@ -2062,6 +2154,7 @@ async function sendFriendRequest(friendId) {
       .from('friends')
       .insert({ user_id: currentUser, friend_id: friendId, status: 'pending' })
     if (error) {
+      console.error('sendFriendRequest insert error:', error)
       showToast('添加好友失败', 'failure')
       return
     }
@@ -2074,36 +2167,41 @@ async function sendFriendRequest(friendId) {
 
 async function acceptFriendRequest(friendshipId) {
   try {
-    await sb.from('friends').update({ status: 'accepted' }).eq('id', friendshipId)
+    const { error: acceptError } = await sb.from('friends').update({ status: 'accepted' }).eq('id', friendshipId)
+    if (acceptError) { console.error('acceptFriendRequest error:', acceptError); showToast('操作失败', 'failure'); return }
     await loadFriends()
     renderFriends()
     renderRequests()
     showToast('已接受好友请求', 'success')
   } catch (e) {
+    console.error('acceptFriendRequest error:', e)
     showToast('操作失败', 'failure')
   }
 }
 
 async function removeFriend(friendshipId, userId) {
   try {
-    await sb.from('friends').delete().eq('id', friendshipId)
+    const { error: removeError } = await sb.from('friends').delete().eq('id', friendshipId)
+    if (removeError) { console.error('removeFriend error:', removeError); showToast('操作失败', 'failure'); return }
     await loadFriends()
     renderFriends()
     renderRequests()
     showToast('已删除好友', 'success')
     closeModal('userProfileModal')
   } catch (e) {
+    console.error('removeFriend error:', e)
     showToast('操作失败', 'failure')
   }
 }
 
 async function openUserProfile(userId) {
   try {
-    const { data: profile } = await sb
+    const { data: profile, error: upProfileError } = await sb
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single()
+    if (upProfileError) { console.error('openUserProfile profile error:', upProfileError); showToast('加载用户档案失败', 'failure'); return }
     if (!profile) {
       showToast('未找到该用户', 'failure')
       return
@@ -2116,10 +2214,11 @@ async function openUserProfile(userId) {
     let friendshipId = null
     let requestSent = false
     if (currentUser) {
-      const { data: friendship } = await sb
+      const { data: friendship, error: upFriendError } = await sb
         .from('friends')
         .select('*')
         .or(`and(user_id.eq.${currentUser},friend_id.eq.${userId}),and(user_id.eq.${userId},friend_id.eq.${currentUser})`)
+      if (upFriendError) console.error('openUserProfile friendship check error:', upFriendError)
       if (friendship && friendship.length > 0) {
         const f = friendship[0]
         if (f.status === 'accepted') {
@@ -2166,8 +2265,12 @@ async function openUserProfile(userId) {
       }
     }
 
-    document.getElementById('userProfileBody').innerHTML = html
-    document.getElementById('profileModalTitle').textContent = `✦ ${profile.nickname || '探测员'} 的档案`
+    const profileBody = document.getElementById('userProfileBody')
+    const profileTitle = document.getElementById('profileModalTitle')
+    if (!profileBody || !profileTitle) { showToast('加载用户档案失败', 'failure'); return }
+
+    profileBody.innerHTML = html
+    profileTitle.textContent = `✦ ${profile.nickname || '探测员'} 的档案`
     openModal('userProfileModal')
   } catch (e) {
     showToast('加载用户档案失败', 'failure')
@@ -2198,7 +2301,9 @@ function closeChat() {
 }
 
 async function loadMessages(friendId) {
-  if (!sb) { document.getElementById('chatMessages').innerHTML = '<div class="chat-empty">服务器未连接</div>'; return }
+  const msgEl = document.getElementById('chatMessages')
+  if (!sb) { if (msgEl) msgEl.innerHTML = '<div class="chat-empty">服务器未连接</div>'; return }
+  if (!msgEl) return
   try {
     const { data, error } = await sb
       .from('messages')
@@ -2220,11 +2325,13 @@ async function loadMessages(friendId) {
 
 function renderChatMessages() {
   const el = document.getElementById('chatMessages')
-  if (chatMessages.length === 0) {
+  if (!el) return
+  const messages = chatMessages || []
+  if (messages.length === 0) {
     el.innerHTML = '<div class="chat-empty">暂无消息，发送第一条吧</div>'
     return
   }
-  el.innerHTML = chatMessages.map(m => {
+  el.innerHTML = messages.map(m => {
     const isSelf = m.sender_id === currentUser
     const cls = isSelf ? 'self' : 'other'
     const senderAvatar = getUserAvatar(m.sender_id)
@@ -2268,6 +2375,7 @@ async function sendMessage() {
     image_url: null,
     created_at: new Date().toISOString()
   }
+  if (!chatMessages) chatMessages = []
   chatMessages.push(tempMsg)
   renderChatMessages()
 
@@ -2311,6 +2419,7 @@ async function sendImageMessage(imageUrl) {
     image_url: imageUrl,
     created_at: new Date().toISOString()
   }
+  if (!chatMessages) chatMessages = []
   chatMessages.push(tempMsg)
   renderChatMessages()
 
@@ -2367,6 +2476,7 @@ function subscribeToMessages(friendId) {
       { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${friendId}` },
       (payload) => {
         if (payload.new && payload.new.sender_id === friendId) {
+          if (!chatMessages) chatMessages = []
           chatMessages.push(payload.new)
           renderChatMessages()
         }
@@ -2380,70 +2490,89 @@ let chatMessages = []
 let chatChannel = null
 
 async function init() {
+  if (!sb) {
+    console.error('Supabase SDK not available, running in offline mode')
+    isSupabaseOnline = false
+    updateSupabaseStatus(false)
+  }
+
   loadTheme()
   initNetStatus()
 
-  try {
-    const { data: { session } } = await sb.auth.getSession()
-    if (session) {
-      currentUser = session.user.id
-
-      let { data: profile } = await sb
-        .from('profiles')
-        .select('*')
-        .eq('id', currentUser)
-        .single()
-
-      if (!profile) {
-        const userEmail = session.user.email || ''
-        const nickname = session.user.user_metadata?.nickname || userEmail.split('@')[0] || '探测员'
-        const { data: newProfile } = await sb
-          .from('profiles')
-          .insert({ id: currentUser, nickname, email: userEmail, avatar: '', favorites: [] })
-          .select()
-          .single()
-        profile = newProfile
-      }
-
-      currentUserProfile = profile
-    }
-    updateSupabaseStatus(true)
-  } catch (e) {
-    console.error('Supabase init error (offline mode):', e)
-    isSupabaseOnline = false
-    updateSupabaseStatus(false)
-  }
-
-  try {
-    await loadIdeas()
-  } catch (e) {
-    console.error('loadIdeas error (offline mode):', e)
-    ideas = []
-    isSupabaseOnline = false
-    updateSupabaseStatus(false)
-  }
-
-  updateUserUI()
-  renderIdeas()
-
-  try {
-    sb.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        currentUser = null
-        currentUserProfile = null
-        updateUserUI()
-        reloadIdeas()
-      } else if (event === 'SIGNED_IN' && session) {
+  if (sb) {
+    try {
+      const { data: { session } } = await sb.auth.getSession()
+      if (session) {
         currentUser = session.user.id
-        sb.from('profiles').select('*').eq('id', currentUser).single().then(({ data }) => {
-          currentUserProfile = data
+
+        let { data: profile, error: profileError } = await sb
+          .from('profiles')
+          .select('*')
+          .eq('id', currentUser)
+          .single()
+
+        if (profileError) {
+          console.error('init profile fetch error:', profileError)
+        }
+
+        if (!profile) {
+          const userEmail = session.user.email || ''
+          const nickname = session.user.user_metadata?.nickname || userEmail.split('@')[0] || '探测员'
+          const { data: newProfile, error: newProfileError } = await sb
+            .from('profiles')
+            .insert({ id: currentUser, nickname, email: userEmail, avatar: '', favorites: [] })
+            .select()
+            .single()
+          if (newProfileError) {
+            console.error('init profile insert error:', newProfileError)
+          }
+          profile = newProfile
+        }
+
+        currentUserProfile = profile
+      }
+      updateSupabaseStatus(true)
+    } catch (e) {
+      console.error('Supabase init error (offline mode):', e)
+      isSupabaseOnline = false
+      updateSupabaseStatus(false)
+    }
+
+    try {
+      await loadIdeas()
+    } catch (e) {
+      console.error('loadIdeas error (offline mode):', e)
+      ideas = []
+      isSupabaseOnline = false
+      updateSupabaseStatus(false)
+    }
+
+    updateUserUI()
+    renderIdeas()
+
+    try {
+      sb.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT') {
+          currentUser = null
+          currentUserProfile = null
           updateUserUI()
           reloadIdeas()
-        })
-      }
-    })
-  } catch (e) {
-    /* ignore */
+        } else if (event === 'SIGNED_IN' && session) {
+          currentUser = session.user.id
+          sb.from('profiles').select('*').eq('id', currentUser).single().then(({ data, error }) => {
+            if (error) { console.error('auth state profile fetch error:', error); return }
+            currentUserProfile = data
+            updateUserUI()
+            reloadIdeas()
+          }).catch(e => console.error('auth state profile fetch error:', e))
+        }
+      })
+    } catch (e) {
+      console.error('auth state change error:', e)
+    }
+  } else {
+    updateUserUI()
+    renderIdeas()
   }
 
   document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -2929,23 +3058,29 @@ async function initSupabaseSession() {
     if (session) {
       currentUser = session.user.id
 
-      let { data: profile } = await sb
+      let { data: profile, error: initSessionProfileError } = await sb
         .from('profiles')
         .select('*')
         .eq('id', currentUser)
         .single()
 
+      if (initSessionProfileError) {
+        console.error('initSupabaseSession profile fetch error:', initSessionProfileError)
+      }
+
       if (!profile) {
         const userEmail = session.user.email || ''
         const nickname = session.user.user_metadata?.nickname || userEmail.split('@')[0] || '探测员'
-        const { data: newProfile } = await sb
+        const { data: newProfile, error: initSessionProfileInsertError } = await sb
           .from('profiles')
           .insert({ id: currentUser, nickname, email: userEmail, avatar: '', favorites: [] })
           .select()
           .single()
+        if (initSessionProfileInsertError) {
+          console.error('initSupabaseSession profile insert error:', initSessionProfileInsertError)
+        }
         profile = newProfile
       } else {
-        // Auto-sync: fix missing fields for old accounts
         profile = await autoFixProfile(profile, session)
       }
 
@@ -2959,23 +3094,26 @@ async function initSupabaseSession() {
         reloadIdeas()
       } else if (event === 'SIGNED_IN' && session) {
         currentUser = session.user.id
-        sb.from('profiles').select('*').eq('id', currentUser).single().then(async ({ data }) => {
+        sb.from('profiles').select('*').eq('id', currentUser).single().then(async ({ data, error }) => {
+          if (error) { console.error('initSupabaseSession auth state profile error:', error); return }
           if (!data) {
             const userEmail = session.user.email || ''
             const nickname = session.user.user_metadata?.nickname || userEmail.split('@')[0] || '探测员'
-            const { data: newProfile } = await sb
+            const { data: newProfile, error: newProfileInsertError } = await sb
               .from('profiles')
               .insert({ id: currentUser, nickname, email: userEmail, avatar: '', favorites: [] })
               .select()
               .single()
+            if (newProfileInsertError) {
+              console.error('initSupabaseSession auth state insert error:', newProfileInsertError)
+            }
             currentUserProfile = newProfile
           } else {
-            // Auto-sync: fix missing fields for old accounts
             currentUserProfile = await autoFixProfile(data, session)
           }
           updateUserUI()
           reloadIdeas()
-        })
+        }).catch(e => console.error('initSupabaseSession auth state change error:', e))
       }
     })
   } catch (e) {
