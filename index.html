@@ -19,8 +19,8 @@
 /* ── critical: mobile splash overrides ── */
 @media(max-width:599px){.splash-grid,.splash-scanline,.splash-hologram,.splash-badge,.splash-ring,.splash-ring::before,.splash-ring::after,.splash-blink{animation:none!important}.splash-content{animation-duration:.01ms!important}#stars{background:transparent;animation:none;transform:none}#stars::after{top:0;left:0;width:1px;height:1px;box-shadow:30px 80px 0 0 rgba(255,255,255,.3),100px 200px 0 0 rgba(255,255,255,.2),60px 40px 0 0 rgba(255,255,255,.4),220px 120px 0 0 rgba(255,255,255,.15),50px 180px 0 0 rgba(255,255,255,.2);width:100%;height:100%}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
-  <link rel="preload" href="style.css?v=18" as="style" onload="this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="style.css?v=18"></noscript>
+  <link rel="preload" href="style.css?v=22" as="style" onload="this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="style.css?v=22"></noscript>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" async></script>
 </head>
@@ -263,7 +263,7 @@
           <label class="form-label" for="regConfirm">确认密码</label>
           <input type="password" id="regConfirm" name="regConfirm" class="form-input modal-input" placeholder="再次输入密码" minlength="6" required autocomplete="new-password">
         </div>
-        <button type="submit" class="modal-submit btn-glow" id="btnRegisterSubmit" style="width:100%;justify-content:center">
+        <button type="submit" class="modal-submit btn-glow" id="btnRegisterSubmit">
           ✦ 注册
         </button>
         <p class="modal-switch">
@@ -291,7 +291,7 @@
           <label class="form-label" for="loginPassword">密码</label>
           <input type="password" id="loginPassword" name="loginPassword" class="form-input modal-input" placeholder="输入密码" required autocomplete="current-password">
         </div>
-        <button type="submit" class="modal-submit btn-glow" style="width:100%;justify-content:center">
+        <button type="submit" class="modal-submit btn-glow">
           ✦ 登录
         </button>
         <p class="modal-switch">
@@ -350,7 +350,7 @@
             </button>
           </div>
         </div>
-        <button type="submit" class="modal-submit btn-glow" style="width:100%;justify-content:center">
+        <button type="submit" class="modal-submit btn-glow">
           ✦ 保存修改
         </button>
       </form>
@@ -380,11 +380,11 @@
       <div class="about-body">
         <div class="about-hero">
           <div class="about-logo">✦ 蛮林世界</div>
-          <p class="about-tagline">科幻创意自留地 · 记录 | 存放 | 展示 | 讨论</p>
+          <p class="about-tagline">深空科幻自留地 · 创作 | 连接 | 发现</p>
         </div>
         <div class="about-section">
           <h3 class="about-section-title">⟐ 关于本站</h3>
-          <p class="about-text">蛮林世界是一个专注于科幻创意记录与分享的轻社区。无论是一个转瞬即逝的脑洞、一个体系完整的硬核设定，还是一篇有感而发的随笔，这里都是它们栖息的场所。此外，平台还聚合了来自互联网的科幻相关资讯、视频、论坛讨论与赛事信息，让你在创作的同时，与世界保持连接。</p>
+          <p class="about-text">蛮林世界是一个聚焦科幻创意与深空美学的轻社区。在这里，你可以记录转瞬即逝的脑洞、打磨体系完整的硬核设定、书写有感而发的科幻随笔。平台还聚合了来自互联网的科幻资讯、赛事信息，内置好友聊天系统与实时背景音乐，让你在这片深空中自由创作、彼此连接。</p>
         </div>
         <div class="about-section">
           <h3 class="about-section-title">⟐ 内容分类</h3>
@@ -415,39 +415,51 @@
         <div class="about-section">
           <h3 class="about-section-title">⟐ 创作功能</h3>
           <ul class="about-features">
-            <li>发布三种类型科幻内容（点子 / 概念 / 随笔）</li>
-            <li>富文本编辑，支持图片插入与预览</li>
-            <li>自定义标签系统，灵活归类</li>
-            <li>分类筛选与全文搜索</li>
-            <li>时间 / 热度双模式排序</li>
-            <li>内容编辑、删除管理</li>
+            <li>发布三种科幻内容（点子 / 概念 / 随笔）</li>
+            <li>Markdown 编辑器，支持图文混排</li>
+            <li>自定义标签，灵活归类与筛选</li>
+            <li>分类切换 + 全文搜索</li>
+            <li>按热度或时间排序浏览</li>
             <li>点赞互动与多级评论（含回复）</li>
             <li>收藏功能，构建你的科幻收藏夹</li>
+            <li>内容编辑、删除（带确认保护）</li>
           </ul>
         </div>
         <div class="about-section">
           <h3 class="about-section-title">⟐ 星际资讯</h3>
           <ul class="about-features">
-            <li>聚合 17+ 科幻相关内容源</li>
-            <li>快闻：文章与论坛讨论</li>
-            <li>赛事：奖项通告、获奖作品、优秀作品推荐</li>
-            <li>涵盖雨果奖、银河奖、星云奖等海内外大奖</li>
-            <li>分类筛选与分页浏览</li>
-            <li>一键刷新，增量更新内容</li>
+            <li>聚合 17+ 科幻内容源</li>
+            <li>快闻：最新文章与论坛讨论</li>
+            <li>赛事：奖项通告、获奖作品推荐</li>
+            <li>涵盖雨果奖、星云奖、银河奖等国内外大奖</li>
+            <li>分类筛选 + 分页浏览</li>
+            <li>一键刷新，本地缓存加速</li>
+          </ul>
+        </div>
+        <div class="about-section">
+          <h3 class="about-section-title">⟐ 好友 &amp; 聊天</h3>
+          <ul class="about-features">
+            <li>搜索其他探测员，发送好友请求</li>
+            <li>好友列表管理，随时查看对方主页</li>
+            <li>一对一文字聊天，支持 Emoji</li>
+            <li>图片发送与在线预览</li>
+            <li>实时消息推送（Supabase Realtime）</li>
           </ul>
         </div>
         <div class="about-section">
           <h3 class="about-section-title">⟐ 用户系统</h3>
           <ul class="about-features">
-            <li>注册与登录，个性化昵称</li>
-            <li>头像上传，自定义形象</li>
-            <li>个人主页，查看你的创作统计</li>
+            <li>注册与登录（Supabase 邮箱认证）</li>
+            <li>自定义昵称，随机昵称生成器</li>
+            <li>头像上传、裁剪与预览</li>
+            <li>个人主页：创作统计与内容一览</li>
             <li>明暗双主题自由切换</li>
-            <li>随机昵称生成器</li>
+            <li>深空弦乐背景音乐（Web Audio 实时合成）</li>
+            <li>安全设置：密码修改、账户注销</li>
           </ul>
         </div>
         <div class="about-section about-footer-section">
-          <p class="about-version">终端 v1.1 · 蛮林世界 MANLIN WORLD</p>
+          <p class="about-version">终端 v1.2 · 蛮林世界 MANLIN WORLD</p>
         </div>
       </div>
     </div>
@@ -558,7 +570,7 @@
         <div class="settings-avatar-section">
           <span class="form-label">探测员头像</span>
           <div class="settings-avatar-row">
-            <img class="settings-avatar-preview" id="settingsAvatarPreview" src="" alt="头像" width="56" height="56">
+            <img class="settings-avatar-preview" id="settingsAvatarPreview" alt="头像" width="56" height="56">
             <div class="settings-avatar-actions">
               <input type="file" id="avatarUpload" name="avatarUpload" accept="image/*" style="display:none">
               <button type="button" class="btn btn-random" id="btnUploadAvatar">📷 上传</button>
@@ -587,7 +599,7 @@
           <label class="form-label" for="settingsConfirmPwd">确认新密码</label>
           <input type="password" id="settingsConfirmPwd" name="settingsConfirmPwd" class="form-input modal-input" placeholder="再次输入新密码" minlength="6" autocomplete="new-password">
         </div>
-        <button type="submit" class="modal-submit btn-glow" style="width:100%;justify-content:center">
+        <button type="submit" class="modal-submit btn-glow">
           ✦ 保存设置
         </button>
       </form>
@@ -606,7 +618,7 @@
       <div class="crop-body">
         <div class="crop-viewport" id="cropViewport">
           <div class="crop-image-wrap" id="cropImageWrap">
-            <img id="cropImage" src="" alt="裁剪头像" draggable="false" width="300" height="300">
+            <img id="cropImage" alt="裁剪头像" draggable="false" width="300" height="300">
           </div>
           <div class="crop-frame"></div>
         </div>
@@ -705,6 +717,6 @@
 
   <!-- bgAudio replaced by Web Audio API space ambient -->
 
-  <script src="script.js?v=20" defer></script>
+  <script src="script.js?v=22" defer></script>
 </body>
 </html>

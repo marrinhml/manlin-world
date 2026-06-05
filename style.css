@@ -1,6 +1,5 @@
 :root {
   --bg-deep: #060a12;
-  -webkit-tap-highlight-color: transparent;
   --bg-surface: #0a0f1a;
   --bg-card: #0d1420;
   --bg-elevated: #111a28;
@@ -52,7 +51,6 @@
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
-  color-scheme: dark light;
 }
 
 body {
@@ -64,6 +62,7 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
 }
 
 ::-webkit-scrollbar {
@@ -360,6 +359,7 @@ body {
   outline: none;
   transition: border-color, box-shadow, background;
   transition-duration: var(--transition);
+  color-scheme: dark;
 }
 
 .form-input::placeholder {
@@ -393,6 +393,7 @@ input:-webkit-autofill:focus {
   min-height: 120px;
   transition: border-color, box-shadow, background;
   transition-duration: var(--transition);
+  color-scheme: dark;
 }
 
 .form-textarea::placeholder {
@@ -1265,6 +1266,7 @@ input:-webkit-autofill:focus {
   outline: none;
   transition: border-color, box-shadow, background;
   transition-duration: var(--transition);
+  color-scheme: dark;
 }
 
 .search-input::placeholder {
@@ -1813,6 +1815,7 @@ input:-webkit-autofill:focus {
   color: var(--blue-nebula);
   flex-shrink: 0;
   box-shadow: 0 0 20px rgba(126, 200, 227, 0.06);
+  overflow: hidden;
 }
 
 .profile-info {
@@ -2434,19 +2437,6 @@ body.reveal .content-section {
   gap: 8px;
 }
 
-.user-avatar {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: rgba(126, 200, 227, 0.1);
-  border: 1px solid rgba(126, 200, 227, 0.25);
-  color: var(--blue-nebula);
-  font-size: 12px;
-}
-
 .user-name {
   font-family: var(--font-mono);
   font-size: 12px;
@@ -2566,6 +2556,7 @@ body.reveal .content-section {
   border-radius: 50%;
   transition: border-color, background, color;
   transition-duration: var(--transition);
+}
 
 .modal-close:hover {
   background: rgba(255, 255, 255, 0.05);
@@ -2590,6 +2581,8 @@ body.reveal .content-section {
 .modal-submit {
   margin-top: 8px;
   padding: 11px 28px !important;
+  width: 100%;
+  justify-content: center;
 }
 
 .modal-switch {
@@ -2989,22 +2982,6 @@ body.reveal .content-section {
   height: 100%;
   border-radius: 50%;
   object-fit: cover;
-}
-
-.profile-avatar-large {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: rgba(126, 200, 227, 0.08);
-  border: 1px solid rgba(126, 200, 227, 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  color: var(--blue-nebula);
-  flex-shrink: 0;
-  box-shadow: 0 0 20px rgba(126, 200, 227, 0.06);
-  overflow: hidden;
 }
 
 .profile-avatar-large .avatar-img {
@@ -3670,6 +3647,7 @@ body.reveal .content-section {
   transition: color 0.3s ease;
   margin: 0 6px;
   vertical-align: middle;
+  color: #5a6a7a;
 }
 
 .net-status.online {
@@ -3689,6 +3667,7 @@ body.reveal .content-section {
   transition: color 0.3s ease;
   margin: 0 4px;
   vertical-align: middle;
+  color: #5a6a7a;
 }
 
 .supabase-status.online {
@@ -3820,7 +3799,7 @@ body.reveal .content-section {
 .btn-accept-request:hover{background:var(--blue-dim)}
 
 /* 好友搜索结果 */
-.friend-search-results{margin-bottom:12px;border:1px solid var(--border-glow);border-radius:var(--radius);background:var(--bg-elevated)}
+.friend-search-results{margin-bottom:12px;border:1px solid var(--border-glow);border-radius:var(--radius-sm);background:var(--bg-elevated)}
 .friend-search-header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border-glow);font-size:12px;font-family:var(--font-mono);color:var(--blue-nebula)}
 .friend-search-list{padding:4px 0}
 .friend-search-empty{padding:24px 0;text-align:center;color:var(--text-dim);font-size:13px}

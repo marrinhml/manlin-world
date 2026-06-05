@@ -2500,83 +2500,6 @@ async function init() {
   initNetStatus()
 
   document.getElementById('btnEnter').addEventListener('click', handleSplashEnter)
-
-  if (sb) {
-    try {
-      const { data: { session } } = await sb.auth.getSession()
-      if (session) {
-        currentUser = session.user.id
-
-        let { data: profile, error: profileError } = await sb
-          .from('profiles')
-          .select('*')
-          .eq('id', currentUser)
-          .single()
-
-        if (profileError) {
-          console.error('init profile fetch error:', profileError)
-        }
-
-        if (!profile) {
-          const userEmail = session.user.email || ''
-          const nickname = session.user.user_metadata?.nickname || userEmail.split('@')[0] || '探测员'
-          const { data: newProfile, error: newProfileError } = await sb
-            .from('profiles')
-            .insert({ id: currentUser, nickname, email: userEmail, avatar: '', favorites: [] })
-            .select()
-            .single()
-          if (newProfileError) {
-            console.error('init profile insert error:', newProfileError)
-          }
-          profile = newProfile
-        }
-
-        currentUserProfile = profile
-      }
-      updateSupabaseStatus(true)
-    } catch (e) {
-      console.error('Supabase init error (offline mode):', e)
-      isSupabaseOnline = false
-      updateSupabaseStatus(false)
-    }
-
-    try {
-      await loadIdeas()
-    } catch (e) {
-      console.error('loadIdeas error (offline mode):', e)
-      ideas = []
-      isSupabaseOnline = false
-      updateSupabaseStatus(false)
-    }
-
-    updateUserUI()
-    renderIdeas()
-
-    try {
-      sb.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_OUT') {
-          currentUser = null
-          currentUserProfile = null
-          updateUserUI()
-          reloadIdeas()
-        } else if (event === 'SIGNED_IN' && session) {
-          currentUser = session.user.id
-          sb.from('profiles').select('*').eq('id', currentUser).single().then(({ data, error }) => {
-            if (error) { console.error('auth state profile fetch error:', error); return }
-            currentUserProfile = data
-            updateUserUI()
-            reloadIdeas()
-          }).catch(e => console.error('auth state profile fetch error:', e))
-        }
-      })
-    } catch (e) {
-      console.error('auth state change error:', e)
-    }
-  } else {
-    updateUserUI()
-    renderIdeas()
-  }
-
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', () => setFilter(btn.dataset.filter))
   })
@@ -2809,7 +2732,81 @@ async function init() {
       }
     })
   })
+  if (sb) {
+    try {
+      const { data: { session } } = await sb.auth.getSession()
+      if (session) {
+        currentUser = session.user.id
 
+        let { data: profile, error: profileError } = await sb
+          .from('profiles')
+          .select('*')
+          .eq('id', currentUser)
+          .single()
+
+        if (profileError) {
+          console.error('init profile fetch error:', profileError)
+        }
+
+        if (!profile) {
+          const userEmail = session.user.email || ''
+          const nickname = session.user.user_metadata?.nickname || userEmail.split('@')[0] || '探测员'
+          const { data: newProfile, error: newProfileError } = await sb
+            .from('profiles')
+            .insert({ id: currentUser, nickname, email: userEmail, avatar: '', favorites: [] })
+            .select()
+            .single()
+          if (newProfileError) {
+            console.error('init profile insert error:', newProfileError)
+          }
+          profile = newProfile
+        }
+
+        currentUserProfile = profile
+      }
+      updateSupabaseStatus(true)
+    } catch (e) {
+      console.error('Supabase init error (offline mode):', e)
+      isSupabaseOnline = false
+      updateSupabaseStatus(false)
+    }
+
+    try {
+      await loadIdeas()
+    } catch (e) {
+      console.error('loadIdeas error (offline mode):', e)
+      ideas = []
+      isSupabaseOnline = false
+      updateSupabaseStatus(false)
+    }
+
+    updateUserUI()
+    renderIdeas()
+
+    try {
+      sb.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT') {
+          currentUser = null
+          currentUserProfile = null
+          updateUserUI()
+          reloadIdeas()
+        } else if (event === 'SIGNED_IN' && session) {
+          currentUser = session.user.id
+          sb.from('profiles').select('*').eq('id', currentUser).single().then(({ data, error }) => {
+            if (error) { console.error('auth state profile fetch error:', error); return }
+            currentUserProfile = data
+            updateUserUI()
+            reloadIdeas()
+          }).catch(e => console.error('auth state profile fetch error:', e))
+        }
+      })
+    } catch (e) {
+      console.error('auth state change error:', e)
+    }
+  } else {
+    updateUserUI()
+    renderIdeas()
+  }
   if (!sb) {
     const checkTimer = setInterval(() => {
       if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
