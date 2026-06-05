@@ -2153,7 +2153,7 @@ function openChat(friendId) {
   if (!currentUser) { showToast('请先登录', 'failure'); return }
   if (!sb) { showToast('服务器未连接', 'failure'); return }
   const friend = friendList.find(f => f.profile.id === friendId)
-  const profile = friend ? friend.profile : (allProfiles && allProfiles.length > 0 ? allProfiles.find(p => p.id === friendId) : null)
+  const profile = friend ? friend.profile : null
   const chatTitle = document.getElementById('chatTitle')
   chatTitle.textContent = profile ? `💬 ${profile.nickname || '探测员'}` : '💬 聊天'
 
@@ -2202,11 +2202,15 @@ function renderChatMessages() {
   el.innerHTML = chatMessages.map(m => {
     const isSelf = m.sender_id === currentUser
     const cls = isSelf ? 'self' : 'other'
-    const senderProfile = allProfiles.find(p => p.id === m.sender_id) || {}
     const senderAvatar = getUserAvatar(m.sender_id)
-    const avatarHtml = senderAvatar
-      ? `<img class="avatar-img" src="${senderAvatar}" alt="">`
-      : (senderProfile.nickname || '?')[0]
+    // 从 friendList 查找对方的昵称作为头像后备
+    let senderLabel = '?'
+    if (isSelf) {
+      senderLabel = (currentUserProfile && currentUserProfile.nickname) || '我'
+    } else {
+      const f = friendList.find(fr => fr.profile && fr.profile.id === m.sender_id)
+      senderLabel = (f && f.profile.nickname) || '探测员'
+    }
     const time = formatDate(m.created_at)
 
     let contentHtml
@@ -2216,7 +2220,7 @@ function renderChatMessages() {
       contentHtml = `<div class="chat-msg-bubble">${m.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`
     }
 
-    return `<div class="chat-msg ${cls}"><div class="chat-msg-avatar">${senderAvatar ? `<img class="avatar-img" src="${senderAvatar}" alt="">` : avatarHtml}</div><div>${contentHtml}<div class="chat-msg-time">${time}</div></div></div>`
+    return `<div class="chat-msg ${cls}"><div class="chat-msg-avatar">${senderAvatar ? `<img class="avatar-img" src="${senderAvatar}" alt="">` : senderLabel[0]}</div><div>${contentHtml}<div class="chat-msg-time">${time}</div></div></div>`
   }).join('')
   setTimeout(() => { el.scrollTop = el.scrollHeight }, 50)
 }
@@ -2285,19 +2289,22 @@ async function sendImageMessage(imageUrl) {
   chatMessages.push(tempMsg)
   renderChatMessages()
 
-  const { error } = await sb.from('messages').insert({
-    sender_id: currentUser,
-    receiver_id: chatPeerId,
-    content: '',
-    type: 'image',
-    image_url: imageUrl,
-    created_at: new Date().toISOString()
-  })
+  try {
+    const { error } = await sb.from('messages').insert({
+      sender_id: currentUser,
+      receiver_id: chatPeerId,
+      content: '',
+      type: 'image',
+      image_url: imageUrl,
+      created_at: new Date().toISOString()
+    })
 
-  if (error) {
+    if (error) throw error
+  } catch (e) {
+    console.error('sendImageMessage error:', e)
     chatMessages = chatMessages.filter(m => m.id !== tempId)
     renderChatMessages()
-    showToast('发送图片失败', 'failure')
+    showToast('发送图片失败：' + (e.message || '未知错误'), 'failure')
   }
 }
 
