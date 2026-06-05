@@ -2499,6 +2499,8 @@ async function init() {
   loadTheme()
   initNetStatus()
 
+  document.getElementById('btnEnter').addEventListener('click', handleSplashEnter)
+
   if (sb) {
     try {
       const { data: { session } } = await sb.auth.getSession()
@@ -2624,8 +2626,6 @@ async function init() {
   document.getElementById('publishForm').addEventListener('submit', handlePublish)
   document.getElementById('btnNewIdea').addEventListener('click', openPublishForm)
   document.getElementById('btnCloseForm').addEventListener('click', closePublishForm)
-
-  document.getElementById('btnEnter').addEventListener('click', handleSplashEnter)
 
   document.getElementById('btnRegister').addEventListener('click', () => openModal('registerModal'))
   document.getElementById('btnCloseRegister').addEventListener('click', () => closeModal('registerModal'))
