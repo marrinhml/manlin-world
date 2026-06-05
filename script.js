@@ -1695,19 +1695,19 @@ function handleSplashEnter() {
   const percentEl = document.getElementById('loadingPercent')
 
   const circumference = 326.7
-  const duration = 3800
+  const duration = 1200
   const startTime = performance.now()
 
-  content.style.transition = 'opacity 0.3s ease'
+  content.style.transition = 'opacity 0.2s ease'
   content.style.opacity = '0'
 
   setTimeout(() => {
     content.style.display = 'none'
     loading.classList.add('active')
-  }, 350)
+  }, 200)
 
   function animateProgress(currentTime) {
-    const elapsed = currentTime - startTime - 350
+    const elapsed = currentTime - startTime - 200
     const progress = Math.min(elapsed / duration, 1)
     const eased = 1 - Math.pow(1 - progress, 3)
     const percent = Math.round(eased * 100)
@@ -1726,21 +1726,11 @@ function handleSplashEnter() {
         setTimeout(() => {
           splash.style.display = 'none'
           document.body.classList.add('reveal')
-          // 封面进入后自动播放背景音乐
-          const audio = document.getElementById('bgAudio')
-          const musicBtn = document.getElementById('btnMusic')
-          if (audio && musicBtn && !window._musicPlaying) {
-            audio.play().then(() => {
-              window._musicPlaying = true
-              musicBtn.classList.add('playing')
-              localStorage.setItem('musicPlaying', 'true')
-            }).catch(() => {})
-          }
           setTimeout(() => {
             openAbout()
-          }, 500)
-        }, 1100)
-      }, 400)
+          }, 300)
+        }, 400)
+      }, 200)
       return
     }
     requestAnimationFrame(animateProgress)
@@ -1819,6 +1809,8 @@ function updateSupabaseStatus(online) {
 
 let friendList = []
 let pendingRequests = []
+let friendCacheTime = 0
+const FRIEND_CACHE_TTL = 15000 // 15秒内不重复请求
 
 async function loadFriends() {
   if (!currentUser) { friendList = []; pendingRequests = []; return }
@@ -1893,7 +1885,11 @@ function renderRequests() {
 }
 
 async function openFriends() {
-  await loadFriends()
+  const now = Date.now()
+  if (now - friendCacheTime > FRIEND_CACHE_TTL) {
+    friendCacheTime = now
+    await loadFriends()
+  }
   renderFriends()
   renderRequests()
   document.querySelector('.friend-tab[data-tab="list"]').click()
@@ -2453,9 +2449,11 @@ async function init() {
     btn.addEventListener('click', () => setSort(btn.dataset.sort))
   })
 
+  let searchDebounce = null
   document.getElementById('searchInput').addEventListener('input', (e) => {
     searchQuery = e.target.value
-    renderIdeas()
+    clearTimeout(searchDebounce)
+    searchDebounce = setTimeout(() => renderIdeas(), 300)
   })
 
   document.querySelectorAll('#publishForm .cat-option').forEach(btn => {
@@ -2672,60 +2670,94 @@ async function init() {
     setTimeout(() => clearInterval(checkTimer), 20000)
   }
 
-  // 背景音乐控制
-  const bgAudio = document.getElementById('bgAudio')
+  // 背景音乐控制 — Web Audio API 太空环境音（零文件零网络请求）
   const btnMusic = document.getElementById('btnMusic')
   const musicBarFill = document.getElementById('musicBarFill')
+  let spaceAudio = null
   window._musicPlaying = false
 
-  // 读取上次播放状态（浏览器会阻止无用户交互的自动播放，静默失败即可）
-  const musicState = localStorage.getItem('musicPlaying')
-  if (musicState === 'true' && bgAudio) {
-    bgAudio.currentTime = parseFloat(localStorage.getItem('musicTime') || '0')
-    bgAudio.play().then(() => {
-      window._musicPlaying = true
-      btnMusic.classList.add('playing')
-    }).catch(() => { /* 浏览器阻止自动播放 */ })
+  function initSpaceAmbient() {
+    if (spaceAudio) return
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      spaceAudio = ctx
+
+      // 主音量控制器
+      const master = ctx.createGain()
+      master.gain.value = 0.35
+      master.connect(ctx.destination)
+
+      // 1) 深空低频嗡鸣 (80Hz, 手机也能听见一点)
+      const osc1 = ctx.createOscillator()
+      osc1.type = 'sine'; osc1.frequency.value = 80
+      const g1 = ctx.createGain(); g1.gain.value = 0.3
+      osc1.connect(g1).connect(master); osc1.start()
+
+      // 2) 中频缓慢起伏 (130Hz, 带颤音效果)
+      const osc2 = ctx.createOscillator()
+      osc2.type = 'sine'; osc2.frequency.value = 130
+      const g2 = ctx.createGain(); g2.gain.value = 0.25
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.1
+      const lg = ctx.createGain(); lg.gain.value = 0.15
+      lfo.connect(lg).connect(g2.gain); lfo.start()
+      osc2.connect(g2).connect(master); osc2.start()
+
+      // 3) 高频泛音 (440Hz A4, 明亮一些)
+      const osc3 = ctx.createOscillator()
+      osc3.type = 'sine'; osc3.frequency.value = 440
+      const g3 = ctx.createGain(); g3.gain.value = 0.08
+      const lfo3 = ctx.createOscillator(); lfo3.frequency.value = 0.05
+      const lg3 = ctx.createGain(); lg3.gain.value = 0.06
+      lfo3.connect(lg3).connect(g3.gain); lfo3.start()
+      osc3.connect(g3).connect(master); osc3.start()
+
+      // 4) 滤波噪声 (太空风声, 手机喇叭能听见)
+      const bufLen = ctx.sampleRate * 3
+      const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate)
+      const data = buf.getChannelData(0)
+      for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1) * 0.4
+      const noise = ctx.createBufferSource()
+      noise.buffer = buf; noise.loop = true
+      const filter = ctx.createBiquadFilter()
+      filter.type = 'bandpass'; filter.frequency.value = 300; filter.Q.value = 1.5
+      const ng = ctx.createGain(); ng.gain.value = 0.15
+      noise.connect(filter).connect(ng).connect(master); noise.start()
+    } catch (e) {
+      console.error('initSpaceAmbient error:', e)
+      showToast('音频初始化失败', 'failure')
+    }
+  }
+
+  function startMusic() {
+    if (!spaceAudio) initSpaceAmbient()
+    if (!spaceAudio) return
+    if (spaceAudio.state === 'suspended') {
+      spaceAudio.resume().catch(e => console.error('AudioContext resume error:', e))
+    }
+  }
+
+  function stopMusic() {
+    if (spaceAudio && spaceAudio.state !== 'closed') {
+      spaceAudio.suspend().catch(e => console.error('AudioContext suspend error:', e))
+    }
   }
 
   if (btnMusic) {
     btnMusic.addEventListener('click', () => {
-      if (!bgAudio) return
       if (window._musicPlaying) {
-        bgAudio.pause()
+        stopMusic()
         btnMusic.classList.remove('playing')
+        musicBarFill.classList.remove('playing')
+        musicBarFill.style.width = '0%'
         localStorage.setItem('musicPlaying', 'false')
       } else {
-        bgAudio.play().then(() => {
-          btnMusic.classList.add('playing')
-          localStorage.setItem('musicPlaying', 'true')
-        }).catch(() => {
-          showToast('请先与页面交互后再播放音乐', 'failure')
-        })
+        startMusic()
+        btnMusic.classList.add('playing')
+        musicBarFill.classList.add('playing')
+        musicBarFill.style.width = '100%'
+        localStorage.setItem('musicPlaying', 'true')
       }
       window._musicPlaying = !window._musicPlaying
-    })
-  }
-
-  // 更新播放进度条（节流：移动端每500ms更新一次以减轻性能负担）
-  if (bgAudio) {
-    let lastUpdate = 0
-    bgAudio.addEventListener('timeupdate', () => {
-      const now = Date.now()
-      if (now - lastUpdate < 200) return
-      lastUpdate = now
-      if (bgAudio.duration) {
-        const pct = (bgAudio.currentTime / bgAudio.duration) * 100
-        musicBarFill.style.width = pct + '%'
-      }
-      // 每5秒保存一次播放位置
-      if (Math.floor(bgAudio.currentTime) % 5 === 0) {
-        localStorage.setItem('musicTime', bgAudio.currentTime.toString())
-      }
-    })
-    bgAudio.addEventListener('pause', () => {
-      localStorage.setItem('musicPlaying', 'false')
-      localStorage.setItem('musicTime', bgAudio.currentTime.toString())
     })
   }
 

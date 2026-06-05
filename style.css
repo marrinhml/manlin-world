@@ -3801,7 +3801,7 @@ body.reveal .content-section {
 
 /* ===== 背景音乐播放器 ===== */
 .music-float{position:fixed;bottom:20px;left:20px;z-index:999;display:flex;align-items:center;gap:8px;cursor:pointer}
-.music-btn{width:40px;height:40px;border-radius:50%;border:1px solid var(--border-glow);background:var(--bg-surface);color:var(--text-secondary);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all var(--transition);box-shadow:0 2px 12px rgba(0,0,0,0.3)}
+.music-btn{width:40px;height:40px;border-radius:50%;border:1px solid var(--border-glow);background:var(--bg-surface);color:var(--text-secondary);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color var(--transition),color var(--transition),background var(--transition),box-shadow var(--transition);box-shadow:0 2px 12px rgba(0,0,0,0.3)}
 .music-btn:hover{border-color:var(--gold);color:var(--gold);box-shadow:0 0 16px rgba(251,191,36,0.2)}
 .music-btn:active{transform:scale(.92)}
 .music-btn.playing{border-color:var(--blue-nebula);color:var(--blue-nebula);box-shadow:0 0 16px rgba(100,140,255,0.3)}
