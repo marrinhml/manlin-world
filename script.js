@@ -219,6 +219,10 @@ async function reloadIdeas() {
   renderIdeas()
 }
 
+function reloadIdeasBg() {
+  loadIdeas().then(() => renderIdeas())
+}
+
 function getDisplayIdeas() {
   let result = [...ideas]
 
@@ -410,14 +414,18 @@ async function handleLike(id) {
     newLikes = (idea.likes || 0) + 1
   }
 
-  await sb
-    .from('ideas')
-    .update({ likes: newLikes, liked_by: newLikedBy })
-    .eq('id', id)
+  const prevLikedBy = [...idea.likedBy]
+  const prevLikes = idea.likes
 
   idea.likedBy = newLikedBy
   idea.likes = newLikes
   renderIdeas()
+
+  sb
+    .from('ideas')
+    .update({ likes: newLikes, liked_by: newLikedBy })
+    .eq('id', id)
+    .then(({ error }) => { if (error) { idea.likedBy = prevLikedBy; idea.likes = prevLikes; renderIdeas() } })
 
   if (wasNotLiked) {
     const btn = document.querySelector(`[data-action="like"][data-id="${id}"]`)
@@ -520,26 +528,16 @@ async function handleSubmitComment(id) {
   const text = input.value.trim()
   if (!text) return
 
-  const { data, error } = await sb
-    .from('comments')
-    .insert({ idea_id: id, author_id: currentUser, text })
-    .select()
-    .single()
-
-  if (error) {
-    showToast('评论发送失败', 'failure')
-    return
-  }
-
+  const tmpId = 'tmp-' + Date.now()
   const idea = ideas.find(item => item.id === id)
   if (idea) {
     if (!idea.comments) idea.comments = []
     idea.comments.push({
-      id: data.id,
+      id: tmpId,
       text,
       author: currentUser,
       authorNickname: currentUserProfile ? currentUserProfile.nickname : '匿名',
-      createdAt: data.created_at,
+      createdAt: new Date().toISOString(),
       likes: 0,
       likedBy: [],
       replies: []
@@ -548,11 +546,19 @@ async function handleSubmitComment(id) {
 
   input.value = ''
   const el = document.getElementById(`comments-${id}`)
-  if (el && !el.classList.contains('open')) {
-    el.classList.add('open')
-  }
+  if (el && !el.classList.contains('open')) el.classList.add('open')
 
   renderIdeas()
+
+  sb.from('comments').insert({ idea_id: id, author_id: currentUser, text }).select().single()
+    .then(({ data, error }) => {
+      if (error || !data) { showToast('评论发送失败', 'failure'); reloadIdeasBg(); return }
+      if (idea) {
+        const cmt = idea.comments.find(c => c.id === tmpId)
+        if (cmt) { cmt.id = data.id; cmt.createdAt = data.created_at }
+      }
+      renderIdeas()
+    })
 }
 
 async function handleCommentLike(ideaId, commentId) {
@@ -1230,16 +1236,16 @@ async function confirmDelete() {
     return
   }
 
-  await sb
-    .from('ideas')
-    .delete()
-    .eq('id', deletingId)
-
-  ideas = ideas.filter(item => item.id !== deletingId)
+  const idToDelete = deletingId
+  ideas = ideas.filter(item => item.id !== idToDelete)
   renderIdeas()
   deletingId = null
   closeModal('confirmModal')
   showToast('内容已删除', 'success')
+
+  sb.from('ideas').delete().eq('id', idToDelete).then(({ error }) => {
+    if (error) { showToast('删除失败，请刷新页面', 'failure'); reloadIdeasBg() }
+  })
 }
 
 function openPublishForm() {
@@ -1364,10 +1370,12 @@ async function handleLogin(e) {
   const password = document.getElementById('loginPassword').value
   if (!email || !password) return
 
-  const { data, error } = await sb.auth.signInWithPassword({
-    email,
-    password
-  })
+  // 先关弹窗给用户即时反馈
+  closeModal('loginModal')
+  document.getElementById('loginForm').reset()
+  showToast('登录中…', 'success')
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password })
 
   if (error) {
     showToast('登录失败：账号或密码错误', 'failure')
@@ -1394,12 +1402,9 @@ async function handleLogin(e) {
   }
 
   currentUserProfile = profile
-
   updateUserUI()
   await reloadIdeas()
   showToast('登录成功', 'success')
-  closeModal('loginModal')
-  document.getElementById('loginForm').reset()
 }
 
 async function handleLogout() {
@@ -2171,13 +2176,17 @@ async function loadMessages(friendId) {
     const { data, error } = await sb
       .from('messages')
       .select('*')
-      .or(`and(sender_id.eq.${currentUser},receiver_id.eq.${friendId}),and(sender_id.eq.${friendId},receiver_id.eq.${currentUser})`)
+      .or(`sender_id.eq.${currentUser},receiver_id.eq.${currentUser}`)
       .order('created_at', { ascending: true })
 
     if (error) throw error
-    chatMessages = data || []
+    chatMessages = (data || []).filter(m =>
+      (m.sender_id === currentUser && m.receiver_id === friendId) ||
+      (m.sender_id === friendId && m.receiver_id === currentUser)
+    )
     renderChatMessages()
   } catch (e) {
+    console.error('loadMessages error:', e)
     document.getElementById('chatMessages').innerHTML = '<div class="chat-empty">加载消息失败</div>'
   }
 }
