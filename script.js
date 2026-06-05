@@ -3020,7 +3020,6 @@ async function init() {
       }
       window._musicPlaying = !window._musicPlaying
     })
-  }
 
   // 事件委托：卡片网格交互（一次性注册，替代每次 render 逐个绑定）
   initCardDelegation()
