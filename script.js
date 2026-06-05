@@ -2245,19 +2245,24 @@ async function sendMessage() {
   input.value = ''
   input.style.height = 'auto'
 
-  const { error } = await sb.from('messages').insert({
-    sender_id: currentUser,
-    receiver_id: chatPeerId,
-    content: content,
-    type: 'text',
-    created_at: new Date().toISOString()
-  })
+  try {
+    const { error } = await sb.from('messages').insert({
+      sender_id: currentUser,
+      receiver_id: chatPeerId,
+      content: content,
+      type: 'text',
+      created_at: new Date().toISOString()
+    })
 
-  if (error) {
+    if (error) {
+      throw error
+    }
+  } catch (e) {
+    console.error('sendMessage error:', e)
     // 回滚
     chatMessages = chatMessages.filter(m => m.id !== tempId)
     renderChatMessages()
-    showToast('发送失败', 'failure')
+    showToast('发送失败：' + (e.message || '未知错误'), 'failure')
     input.value = content
   }
 }
