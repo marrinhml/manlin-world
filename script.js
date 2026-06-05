@@ -1856,10 +1856,11 @@ function renderFriends() {
   }
   el.innerHTML = friendList.map(f => `
     <div class="friend-item" data-userid="${f.profile.id}">
-      <div class="friend-avatar clickable-avatar" data-userid="${f.profile.id}">${f.profile.avatar ? `<img class="avatar-img" src="${f.profile.avatar}" alt="">` : '✦'}</div>
+      <div class="friend-avatar clickable-avatar" data-action="chat" data-userid="${f.profile.id}">${f.profile.avatar ? `<img class="avatar-img" src="${f.profile.avatar}" alt="">` : '✦'}</div>
       <div class="friend-info">
-        <div class="friend-name clickable-name" data-userid="${f.profile.id}">${f.profile.nickname || '探测员'}</div>
+        <div class="friend-name clickable-name" data-action="chat" data-userid="${f.profile.id}">${f.profile.nickname || '探测员'}</div>
       </div>
+      <button class="btn btn-sm btn-chat" data-action="chat" data-userid="${f.profile.id}" title="发消息">💬</button>
       <button class="btn btn-sm btn-remove-friend" data-friendshipid="${f.friendshipId}" data-userid="${f.profile.id}">删除</button>
     </div>
   `).join('')
@@ -2143,6 +2144,162 @@ async function openUserProfile(userId) {
   }
 }
 
+function openChat(friendId) {
+  if (!currentUser) { showToast('请先登录', 'failure'); return }
+  const friend = friendList.find(f => f.profile.id === friendId)
+  const profile = friend ? friend.profile : (allProfiles && allProfiles.length > 0 ? allProfiles.find(p => p.id === friendId) : null)
+  const chatTitle = document.getElementById('chatTitle')
+  chatTitle.textContent = profile ? `💬 ${profile.nickname || '探测员'}` : '💬 聊天'
+
+  chatPeerId = friendId
+  document.getElementById('chatMessages').innerHTML = '<div class="chat-empty">加载中…</div>'
+  document.getElementById('chatTextInput').value = ''
+  openModal('chatModal')
+
+  loadMessages(friendId)
+  subscribeToMessages(friendId)
+}
+
+function closeChat() {
+  chatPeerId = null
+  if (chatChannel && sb) { sb.removeChannel(chatChannel); chatChannel = null }
+  closeModal('chatModal')
+}
+
+async function loadMessages(friendId) {
+  try {
+    const { data, error } = await sb
+      .from('messages')
+      .select('*')
+      .or(`and(sender_id.eq.${currentUser},receiver_id.eq.${friendId}),and(sender_id.eq.${friendId},receiver_id.eq.${currentUser})`)
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+    chatMessages = data || []
+    renderChatMessages()
+  } catch (e) {
+    document.getElementById('chatMessages').innerHTML = '<div class="chat-empty">加载消息失败</div>'
+  }
+}
+
+function renderChatMessages() {
+  const el = document.getElementById('chatMessages')
+  if (chatMessages.length === 0) {
+    el.innerHTML = '<div class="chat-empty">暂无消息，发送第一条吧</div>'
+    return
+  }
+  el.innerHTML = chatMessages.map(m => {
+    const isSelf = m.sender_id === currentUser
+    const cls = isSelf ? 'self' : 'other'
+    const senderProfile = allProfiles.find(p => p.id === m.sender_id) || {}
+    const senderAvatar = getUserAvatar(m.sender_id)
+    const avatarHtml = senderAvatar
+      ? `<img class="avatar-img" src="${senderAvatar}" alt="">`
+      : (senderProfile.nickname || '?')[0]
+    const time = formatDate(m.created_at)
+
+    let contentHtml
+    if (m.type === 'image' && m.image_url) {
+      contentHtml = `<div class="chat-msg-imgwrap"><img class="chat-msg-img" src="${m.image_url}" alt="聊天图片" loading="lazy" data-action="viewChatImage" data-url="${m.image_url}"></div>`
+    } else {
+      contentHtml = `<div class="chat-msg-bubble">${m.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`
+    }
+
+    return `<div class="chat-msg ${cls}"><div class="chat-msg-avatar">${senderAvatar ? `<img class="avatar-img" src="${senderAvatar}" alt="">` : avatarHtml}</div><div>${contentHtml}<div class="chat-msg-time">${time}</div></div></div>`
+  }).join('')
+  setTimeout(() => { el.scrollTop = el.scrollHeight }, 50)
+}
+
+async function sendMessage() {
+  if (!chatPeerId || !currentUser) return
+  const input = document.getElementById('chatTextInput')
+  const content = input.value.trim()
+  if (!content) return
+
+  input.value = ''
+  input.style.height = 'auto'
+
+  try {
+    const { error } = await sb.from('messages').insert({
+      sender_id: currentUser,
+      receiver_id: chatPeerId,
+      content: content,
+      type: 'text',
+      created_at: new Date().toISOString()
+    })
+    if (error) throw error
+
+    const { data: newMsg } = await sb.from('messages').select('*').order('created_at', { ascending: false }).limit(1).eq('sender_id', currentUser).single()
+    if (newMsg) { chatMessages.push(newMsg); renderChatMessages() }
+  } catch (e) {
+    showToast('发送失败', 'failure')
+    input.value = content
+  }
+}
+
+async function sendImageMessage(imageUrl) {
+  if (!chatPeerId || !currentUser) return
+  try {
+    const { error } = await sb.from('messages').insert({
+      sender_id: currentUser,
+      receiver_id: chatPeerId,
+      content: '',
+      type: 'image',
+      image_url: imageUrl,
+      created_at: new Date().toISOString()
+    })
+    if (error) throw error
+  } catch (e) {
+    showToast('发送图片失败', 'failure')
+  }
+}
+
+async function handleChatImageUpload(file) {
+  if (!chatPeerId || !currentUser) return
+  if (file.size > 5 * 1024 * 1024) { showToast('图片不能超过 5MB', 'failure'); return }
+
+  const btn = document.getElementById('btnChatImage')
+  btn.disabled = true
+  showToast('上传中…', 'success')
+
+  try {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${currentUser}/${Date.now()}-${Math.random().toString(36).substring(2,8)}.${fileExt}`
+    const { error } = await sb.storage.from('chat-images').upload(fileName, file, { contentType: file.type })
+    if (error) throw error
+
+    const { data: urlData } = sb.storage.from('chat-images').getPublicUrl(fileName)
+    if (urlData && urlData.publicUrl) {
+      await sendImageMessage(urlData.publicUrl)
+    }
+  } catch (e) {
+    showToast('图片上传失败，请检查 Supabase Storage 是否已创建 chat-images 存储桶', 'failure')
+  } finally {
+    btn.disabled = false
+  }
+}
+
+function subscribeToMessages(friendId) {
+  if (chatChannel) { sb.removeChannel(chatChannel) }
+
+  chatChannel = sb
+    .channel('chat-' + [currentUser, friendId].sort().join('-'))
+    .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${friendId}` },
+      (payload) => {
+        if (payload.new && payload.new.sender_id === friendId) {
+          chatMessages.push(payload.new)
+          renderChatMessages()
+        }
+      }
+    )
+    .subscribe()
+}
+
+let chatPeerId = null
+let chatMessages = []
+let chatChannel = null
+
 async function init() {
   loadTheme()
   initNetStatus()
@@ -2309,9 +2466,12 @@ async function init() {
   document.getElementById('friendModal').addEventListener('click', (e) => {
     const avatar = e.target.closest('.clickable-avatar')
     const name = e.target.closest('.clickable-name')
+    const chatBtn = e.target.closest('[data-action="chat"]')
     const acceptBtn = e.target.closest('.btn-accept-request')
     const removeBtn = e.target.closest('.btn-remove-friend')
-    if (avatar || name) {
+    if (chatBtn) {
+      openChat(chatBtn.dataset.userid)
+    } else if (avatar || name) {
       const userId = (avatar || name).dataset.userid
       openUserProfile(userId)
     } else if (acceptBtn) {
@@ -2331,6 +2491,29 @@ async function init() {
     }
   })
   document.getElementById('btnCloseUserProfile').addEventListener('click', () => closeModal('userProfileModal'))
+
+  document.getElementById('btnCloseChat').addEventListener('click', closeChat)
+  document.getElementById('btnChatSend').addEventListener('click', sendMessage)
+  document.getElementById('chatTextInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
+  })
+  document.getElementById('chatTextInput').addEventListener('input', function() {
+    this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 120) + 'px'
+  })
+  document.getElementById('btnChatImage').addEventListener('click', () => {
+    document.getElementById('chatImageInput').click()
+  })
+  document.getElementById('chatImageInput').addEventListener('change', (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleChatImageUpload(e.target.files[0])
+      e.target.value = ''
+    }
+  })
+
+  document.getElementById('chatModal').addEventListener('click', (e) => {
+    const img = e.target.closest('[data-action="viewChatImage"]')
+    if (img) { window.open(img.dataset.url, '_blank') }
+  })
 
   document.getElementById('btnTheme').addEventListener('click', () => {
     const isLight = document.documentElement.getAttribute('data-theme') === 'light'

@@ -673,6 +673,26 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="chatModal">
+    <div class="modal-card chat-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="chatTitle">💬 聊天</h2>
+        <button class="modal-close" id="btnCloseChat" aria-label="关闭聊天">✕</button>
+      </div>
+      <div class="chat-body">
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-empty">选择一位好友开始对话</div>
+        </div>
+        <div class="chat-input-area" id="chatInputArea">
+          <input type="file" id="chatImageInput" accept="image/*" style="display:none">
+          <button class="chat-btn-img" id="btnChatImage" aria-label="发送图片">🖼</button>
+          <textarea class="chat-textarea" id="chatTextInput" placeholder="输入消息…" rows="1" maxlength="2000" aria-label="消息输入"></textarea>
+          <button class="chat-btn-send" id="btnChatSend">发送</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <button class="theme-float" id="btnTheme" aria-label="切换主题">◐</button>
 
   <div class="music-float" id="musicControl">
@@ -685,6 +705,6 @@
 
   <audio id="bgAudio" src="audio/bgm.mp3" loop preload="none"></audio>
 
-  <script src="script.js?v=4"></script>
+  <script src="script.js?v=5"></script>
 </body>
 </html>
