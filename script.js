@@ -119,11 +119,8 @@ async function loadIdeas() {
     grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⟡</div><p class="empty-text">正在接收星际信号…</p><p class="empty-hint">正在从各星系节点获取最新数据</p></div>`
   }
 
-  // 第1步：并行获取 ideas 和 comments（无依赖关系）
-  const [ideasResult, commentsResult] = await Promise.all([
-    sb.from('ideas').select('*').order('created_at', { ascending: false }),
-    sb.from('comments').select('*').order('created_at', { ascending: true })
-  ])
+  // 第1步：只拉最新 30 条 ideas（手机端性能关键优化）
+  const ideasResult = await sb.from('ideas').select('*').order('created_at', { ascending: false }).limit(30)
 
   const ideasData = ideasResult.data
   const error = ideasResult.error
@@ -134,10 +131,12 @@ async function loadIdeas() {
     return
   }
 
+
+  // 第2步：只查这 30 条 idea 的评论（不再全库拉取）
+  const ideaIds = ideasData.map(i => i.id)
+  const commentsResult = await sb.from('comments').select('*').in('idea_id', ideaIds).order('created_at', { ascending: true })
   const commentsData = commentsResult.data || []
   if (commentsResult.error) console.error('loadIdeas comments error:', commentsResult.error)
-
-  const ideaIds = ideasData.map(i => i.id)
   const commentIds = commentsData.map(c => c.id)
 
   // 第2步：并行获取 replies 和 profiles（无依赖关系）
@@ -1796,7 +1795,6 @@ function handleSplashEnter() {
       setTimeout(() => { splash.style.display = 'none' }, 400)
     }
     document.body.classList.add('reveal')
-    setTimeout(() => { openAbout() }, 300)
   }
 
   try {
@@ -1842,7 +1840,6 @@ function handleSplashEnter() {
             setTimeout(() => { splash.style.display = 'none' }, 400)
           }
           document.body.classList.add('reveal')
-          setTimeout(() => { openAbout() }, 300)
         }, 200)
         clearTimeout(safetyTimer)
         return
@@ -2971,6 +2968,7 @@ async function init() {
       const ctx = new (window.AudioContext || window.webkitAudioContext)()
       spaceAudio = ctx
       spaceAudio._timers = []
+      const isMobile = window.innerWidth <= 599
 
       const master = ctx.createGain()
       master.gain.value = 0.8
@@ -3008,8 +3006,8 @@ async function init() {
       }, 10000)
       spaceAudio._timers.push(bassTimer)
 
-      // === 弦乐和弦 Pad：三角波多组微 detune 模拟弦乐群 ===
-      // Cmaj9 → Am9 → Cmaj9 → Fmaj9 → Am9 → Gsus4
+      // === 弦乐和弦 Pad（桌面端独享，手机端跳过以节省 CPU） ===
+      if (!isMobile) {
       const chordDefs = [
         [261.63, 329.63, 392.00, 440.00],  // Cmaj9
         [220.00, 261.63, 329.63, 392.00],  // Am9
@@ -3023,7 +3021,6 @@ async function init() {
       chordDefs.forEach((notes) => {
         const voices = []
         notes.forEach(freq => {
-          // 3 个三角波微 detune = 弦乐群音色
           [-12, 0, 12].forEach(det => {
             const o = ctx.createOscillator()
             o.type = 'triangle'
@@ -3040,7 +3037,7 @@ async function init() {
         padList.push(voices)
       })
 
-      const padVol = 0.022  // 每个振荡器
+      const padVol = 0.022
       padList[0].forEach(g => { g.gain.value = padVol })
 
       let chordIdx = 0
@@ -3052,6 +3049,7 @@ async function init() {
         chordIdx = next
       }, 10000)
       spaceAudio._timers.push(chordTimer)
+      }
 
       // === 弦乐主旋律：三角波，温柔带有轻微颤音质感 ===
       // C 大调五声音阶，缓慢悠扬的旋律线
@@ -3081,9 +3079,10 @@ async function init() {
       spaceAudio._timers.push(melTimer)
 
       // =============================================================
-      // 电子声部（辅）
+      // 电子声部（桌面端独享）
       // =============================================================
 
+      if (!isMobile) {
       // === 电子琶音：正弦波，轻柔点缀 ===
       const elecNotes = [783.99, 880.00, 1046.50, 1174.66, 1046.50, 880.00, 783.99, 659.25]
       const elecOsc = ctx.createOscillator()
@@ -3103,6 +3102,7 @@ async function init() {
         elecG.gain.setTargetAtTime(0.025, now + 0.2, 0.5)
       }, 2800)
       spaceAudio._timers.push(elecTimer)
+      }
 
       // === 太空底噪（极轻的低频风声） ===
       const noiseLen = ctx.sampleRate * 2
