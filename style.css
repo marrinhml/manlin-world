@@ -573,9 +573,6 @@ input:-webkit-autofill:focus {
   position: relative;
   opacity: 0;
   transform: translateY(20px) translateZ(0);
-  backface-visibility: hidden;
-  content-visibility: auto;
-  contain: content;
 }
 
 .idea-card.in-view {
@@ -2778,10 +2775,6 @@ body.reveal .content-section {
 
 /* 移动端额外性能优化：减少动画、提升滚动流畅度 */
 @media (max-width: 599px) {
-  .idea-card {
-    content-visibility: auto;
-    contain: content;
-  }
   .idea-card.in-view {
     animation-duration: 0.3s;
   }
