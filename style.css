@@ -52,7 +52,6 @@ html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   width: 100%;
-  overflow-x: hidden;
 }
 
 body {
@@ -572,7 +571,7 @@ input:-webkit-autofill:focus {
   transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.35s ease, box-shadow 0.35s ease;
   position: relative;
   opacity: 0;
-  transform: translateY(20px) translateZ(0);
+  transform: translateY(20px);
 }
 
 .idea-card.in-view {
@@ -582,13 +581,13 @@ input:-webkit-autofill:focus {
 @keyframes cardIn {
   to {
     opacity: 1;
-    transform: translateY(0) translateZ(0);
+    transform: translateY(0);
   }
 }
 
 .idea-card:hover {
   border-color: var(--border-glow-strong);
-  transform: translateY(-3px) translateZ(0);
+  transform: translateY(-3px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 30px var(--shadow-glow);
 }
 
@@ -2762,7 +2761,7 @@ body.reveal .content-section {
 /* 移动端禁用 hover 效果（防止触摸频闪） */
 @media (hover: none) and (pointer: coarse) {
   .idea-card:hover {
-    transform: translateY(0) translateZ(0) !important;
+    transform: translateY(0) !important;
     box-shadow: none !important;
   }
   .splash-btn:hover .splash-btn-border {
@@ -2775,9 +2774,9 @@ body.reveal .content-section {
 
 /* 移动端额外性能优化：减少动画、提升滚动流畅度 */
 @media (max-width: 599px) {
-  .idea-card.in-view {
-    animation-duration: 0.3s;
-  }
+  /* 手机端卡片直接显示，不依赖 IntersectionObserver（快速滚动会漏判） */
+  .idea-card { opacity: 1; transform: none; animation: none; }
+  .idea-card.in-view { animation: none; }
   .modal-content {
     -webkit-overflow-scrolling: touch;
   }
@@ -2804,7 +2803,7 @@ body.reveal .content-section {
     -webkit-backdrop-filter: none;
     padding-top: env(safe-area-inset-top);
   }
-  .modal-card {
+  .modal-card, .modal-overlay {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
@@ -3927,8 +3926,8 @@ body.reveal .content-section {
   .modal-overlay.active{padding:8px}
   .modal-card{max-width:calc(100vw - 16px);box-sizing:border-box}
   .chat-card,.detail-card,.friend-card,.profile-card{max-width:100%!important;border-radius:0}
-  /* 性能优化：禁用 backdrop-filter + 强制 GPU 合成层减少滚动频闪 */
-  .header{backdrop-filter:none;-webkit-backdrop-filter:none;transform:translateZ(0)}
+  /* 性能优化：禁用昂贵的 backdrop-filter */
+  .header{backdrop-filter:none;-webkit-backdrop-filter:none}
   .idea-card,.publish-card{box-shadow:none}
 }
 

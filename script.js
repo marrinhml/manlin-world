@@ -1748,6 +1748,7 @@ function setTheme(mode) {
 }
 
 function observeCards() {
+  if (window.innerWidth <= 599) return
   const cards = document.querySelectorAll('.idea-card:not(.in-view)')
   if (cards.length === 0) return
 
