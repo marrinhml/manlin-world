@@ -3164,6 +3164,23 @@ async function init() {
     localStorage.setItem('musicPlaying', 'true')
   }
 
+  // 尝试自动播放 + 任意点击触发（绕过浏览器 autoplay 限制）
+  function tryAutoPlayOnFirstClick() {
+    if (window._musicPlaying) return
+    window._autoPlayMusic()
+    // 只触发一次，触发后移除监听
+    document.removeEventListener('click', tryAutoPlayOnFirstClick)
+  }
+
+  // 页面加载后立即尝试自动播放
+  setTimeout(() => {
+    if (!window._musicPlaying) {
+      window._autoPlayMusic()
+      // 加个兜底点击触发（如果自动播放被浏览器拦截）
+      document.addEventListener('click', tryAutoPlayOnFirstClick, { once: true })
+    }
+  }, 100)
+
   // 事件委托：卡片网格交互（一次性注册，替代每次 render 逐个绑定）
   initCardDelegation()
 }
