@@ -2497,6 +2497,7 @@ body.reveal .content-section {
   transition: opacity 0.35s ease;
   padding: 20px;
   overscroll-behavior: contain;
+  box-sizing: border-box;
 }
 
 .modal-overlay.active {
@@ -3920,26 +3921,45 @@ body.reveal .content-section {
 
 /* ===== 移动端全面适配优化 ===== */
 
-/* 防止任何元素横向溢出页面 */
 @media(max-width:599px){
-  .header-controls{flex-wrap:wrap;gap:4px}
+  .header-controls{flex-wrap:wrap;gap:6px}
+  .header-controls .btn-primary{font-size:12px;padding:6px 10px;min-height:36px}
+  .header-controls .btn-sm{font-size:11px;padding:4px 8px;min-height:32px}
+  .btn-logout{font-size:10px!important;padding:3px 8px!important;min-height:28px}
+  .logo-text{font-size:16px;letter-spacing:2px}
+  .btn-about{font-size:11px!important;padding:1px 6px!important}
+  .net-status,.supabase-status{font-size:12px}
   .about-features{grid-template-columns:1fr}
   .splash-hologram{width:180px;height:180px}
   .splash-notice{max-width:calc(100vw - 48px);font-size:10px}
-  .modal-card{max-width:calc(100vw - 16px)}
-  .filter-bar{flex-wrap:wrap;gap:4px}
-  .sort-controls{flex-wrap:wrap;gap:2px}
+  /* 弹窗统一加边距防止溢出 */
+  .modal-overlay.active{padding:8px}
+  .modal-card{max-width:calc(100vw - 16px);box-sizing:border-box}
+  .chat-card,.detail-card,.friend-card,.profile-card{max-width:100%!important;border-radius:0}
+  .filter-bar{flex-wrap:wrap;gap:6px}
+  .sort-controls{flex-wrap:wrap;gap:4px}
   .search-input{min-width:120px}
 }
 
-/* 极小屏（≤380px）适配 */
+@media(max-width:480px){
+  .header-controls{gap:4px}
+  .header-controls .btn,.header-controls .btn-primary,.header-controls .btn-sm{font-size:11px;padding:4px 6px;min-height:32px}
+  .user-name{display:none}
+  .user-avatar{width:24px;height:24px;font-size:12px}
+  .btn-logout{font-size:9px!important;padding:2px 6px!important}
+  .logo-text{font-size:14px;letter-spacing:1px}
+  .logo-sub{display:none}
+  .net-status,.supabase-status{font-size:10px;margin:0 2px}
+}
+
 @media(max-width:380px){
-  .header-controls .btn,.header-controls .btn-primary,.header-controls .btn-sm{font-size:11px;padding:5px 8px}
-  .splash-title{font-size:26px}
+  .header-controls .btn,.header-controls .btn-primary,.header-controls .btn-sm{font-size:10px;padding:3px 5px;min-height:28px}
+  .splash-title{font-size:24px}
   .splash-subtitle{font-size:10px}
-  .splash-btn{font-size:16px;padding:12px 36px}
-  .card-content{font-size:13px}
+  .splash-btn{font-size:15px;padding:10px 30px}
+  .header-controls{gap:3px}
   .modal-card{padding:0;max-width:100%;border-radius:0;min-height:100vh}
-  .modal-body{padding:16px}
-  .modal-header{padding:12px 16px}
+  .modal-body{padding:12px}
+  .modal-header{padding:10px 12px}
+  .modal-overlay.active{padding:0}
 }

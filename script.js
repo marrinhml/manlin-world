@@ -3153,9 +3153,21 @@ async function init() {
     })
 
   // 暴露自动播放函数，供 splash enter 调用
-  window._autoPlayMusic = function() {
+  window._autoPlayMusic = async function() {
     if (window._musicPlaying) return
     if (!spaceAudio) initSpaceAmbient()
+    if (!spaceAudio) return
+
+    // 异步等待 AudioContext 真正唤醒，避免 UI 显示播放但实际无声音
+    if (spaceAudio.state === 'suspended') {
+      try {
+        await spaceAudio.resume()
+      } catch (e) {
+        console.warn('Auto-play blocked by browser, waiting for user gesture')
+        return  // 不标记为 playing，让点击兜底触发
+      }
+    }
+
     startMusic()
     btnMusic.classList.add('playing')
     musicBarFill.classList.add('playing')
