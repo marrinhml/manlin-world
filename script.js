@@ -1772,6 +1772,11 @@ function handleSplashEnter() {
   if (window._splashEntering) return
   window._splashEntering = true
 
+  // 自动播放背景音乐（用户点击手势，可绕过浏览器自动播放限制）
+  if (window._autoPlayMusic) {
+    window._autoPlayMusic()
+  }
+
   // 安全兜底：3秒后无论动画是否完成都进入
   const safetyTimer = setTimeout(() => {
     forceEnterSite()
@@ -3029,6 +3034,18 @@ async function init() {
       }
       window._musicPlaying = !window._musicPlaying
     })
+
+  // 暴露自动播放函数，供 splash enter 调用
+  window._autoPlayMusic = function() {
+    if (window._musicPlaying) return
+    if (!spaceAudio) initSpaceAmbient()
+    startMusic()
+    btnMusic.classList.add('playing')
+    musicBarFill.classList.add('playing')
+    musicBarFill.style.width = '100%'
+    window._musicPlaying = true
+    localStorage.setItem('musicPlaying', 'true')
+  }
 
   // 事件委托：卡片网格交互（一次性注册，替代每次 render 逐个绑定）
   initCardDelegation()

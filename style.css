@@ -2275,6 +2275,22 @@ input:-webkit-autofill:focus {
   transform: translateX(4px);
 }
 
+.splash-notice {
+  margin-top: 24px;
+  padding: 8px 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--gold);
+  background: rgba(201, 168, 76, 0.06);
+  border: 1px solid rgba(201, 168, 76, 0.15);
+  border-radius: 4px;
+  letter-spacing: 1px;
+  line-height: 1.6;
+  max-width: 460px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .splash-footer-text {
   margin-top: 48px;
   font-family: var(--font-mono);
