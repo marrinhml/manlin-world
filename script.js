@@ -1481,6 +1481,7 @@ async function handleLogin(e) {
 }
 
 async function handleLogout() {
+  unsubscribeIncomingMessages()
   await sb.auth.signOut()
   currentUser = null
   currentUserProfile = null
@@ -1936,6 +1937,8 @@ let friendList = []
 let pendingRequests = []
 let friendCacheTime = 0
 const FRIEND_CACHE_TTL = 15000 // 15秒内不重复请求
+let unreadMsgCount = 0
+let incomingChannel = null
 
 async function loadFriends() {
   if (!currentUser) { friendList = []; pendingRequests = []; return }
@@ -2023,6 +2026,7 @@ async function openFriends() {
   renderRequests()
   document.querySelector('.friend-tab[data-tab="list"]').click()
   openModal('friendModal')
+  checkUnreadMessages()
 }
 
 async function searchUsers(query) {
@@ -2318,12 +2322,111 @@ function openChat(friendId) {
 
   loadMessages(friendId)
   subscribeToMessages(friendId)
+  // 标记该好友消息为已读
+  markChatRead(friendId)
 }
 
 function closeChat() {
   chatPeerId = null
   if (chatChannel && sb) { sb.removeChannel(chatChannel); chatChannel = null }
   closeModal('chatModal')
+  // 关闭聊天后重新检查未读消息
+  setTimeout(checkUnreadMessages, 300)
+}
+
+// ========== 未读消息小标 ==========
+
+function showMsgBadge(count) {
+  const badge = document.getElementById('friendMsgBadge')
+  if (!badge) return
+  badge.textContent = count > 99 ? '99+' : count
+  badge.style.display = 'inline-flex'
+}
+
+function hideMsgBadge() {
+  const badge = document.getElementById('friendMsgBadge')
+  if (badge) badge.style.display = 'none'
+}
+
+async function checkUnreadMessages() {
+  if (!currentUser || !sb) { hideMsgBadge(); unreadMsgCount = 0; return }
+  try {
+    // 读取每个好友的最后阅读时间
+    let lastReadMap = {}
+    try {
+      const stored = localStorage.getItem('chatLastRead_' + currentUser)
+      if (stored) lastReadMap = JSON.parse(stored)
+    } catch (e) { /* ignore */ }
+
+    // 找出所有好友中最早的阅读时间，只查询该时间之后的消息
+    const allTimes = Object.values(lastReadMap)
+    const oldestRead = allTimes.length > 0 ? allTimes.reduce((min, t) => Math.min(min, t), Infinity) : 0
+
+    let query = sb
+      .from('messages')
+      .select('sender_id, created_at')
+      .eq('receiver_id', currentUser)
+    if (oldestRead > 0) {
+      query = query.gte('created_at', new Date(oldestRead).toISOString())
+    }
+    const { data, error } = await query.order('created_at', { ascending: false })
+
+    if (error) throw error
+    if (!data || data.length === 0) { hideMsgBadge(); unreadMsgCount = 0; return }
+
+    unreadMsgCount = 0
+    const friendIds = new Set(friendList.map(f => f.profile.id))
+    data.forEach(m => {
+      if (!friendIds.has(m.sender_id)) return
+      const lastRead = lastReadMap[m.sender_id] || 0
+      const msgTime = new Date(m.created_at).getTime()
+      if (msgTime > lastRead) unreadMsgCount++
+    })
+
+    if (unreadMsgCount > 0) showMsgBadge(unreadMsgCount)
+    else hideMsgBadge()
+  } catch (e) {
+    console.error('checkUnreadMessages error:', e)
+    hideMsgBadge()
+  }
+}
+
+function markChatRead(friendId) {
+  if (!currentUser) return
+  let lastReadMap = {}
+  try {
+    const stored = localStorage.getItem('chatLastRead_' + currentUser)
+    if (stored) lastReadMap = JSON.parse(stored)
+  } catch (e) { /* ignore */ }
+  lastReadMap[friendId] = Date.now()
+  localStorage.setItem('chatLastRead_' + currentUser, JSON.stringify(lastReadMap))
+  checkUnreadMessages()
+}
+
+function subscribeToIncomingMessages() {
+  if (!currentUser || !sb) return
+  if (incomingChannel) { sb.removeChannel(incomingChannel); incomingChannel = null }
+
+  incomingChannel = sb
+    .channel('incoming-messages')
+    .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${currentUser}` },
+      (payload) => {
+        // 新消息来自好友而非自己
+        if (payload.new && payload.new.sender_id !== currentUser) {
+          checkUnreadMessages()
+        }
+      }
+    )
+    .subscribe()
+}
+
+function unsubscribeIncomingMessages() {
+  if (incomingChannel && sb) {
+    sb.removeChannel(incomingChannel)
+    incomingChannel = null
+  }
+  hideMsgBadge()
 }
 
 async function loadMessages(friendId) {
@@ -2800,9 +2903,18 @@ async function init() {
     updateUserUI()
     renderIdeas()
 
+    // 检查未读消息并订阅新消息推送
+    if (currentUser) {
+      loadFriends().then(() => {
+        checkUnreadMessages()
+        subscribeToIncomingMessages()
+      })
+    }
+
     try {
       sb.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_OUT') {
+          unsubscribeIncomingMessages()
           currentUser = null
           currentUserProfile = null
           updateUserUI()
@@ -2814,6 +2926,11 @@ async function init() {
             currentUserProfile = data
             updateUserUI()
             reloadIdeas()
+            // 登录后检查未读消息
+            loadFriends().then(() => {
+              checkUnreadMessages()
+              subscribeToIncomingMessages()
+            })
           }).catch(e => console.error('auth state profile fetch error:', e))
         }
       })

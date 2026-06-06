@@ -3767,6 +3767,7 @@ body.reveal .content-section {
 .friend-tab.active{color:var(--blue-nebula);border-bottom-color:var(--blue-nebula)}
 
 .req-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--gold);color:var(--bg-deep);font-size:10px;font-weight:700;vertical-align:middle;margin-left:4px}
+.friend-msg-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;vertical-align:middle;margin-left:4px;line-height:1;box-shadow:0 0 6px rgba(239,68,68,.4)}
 
 .friend-item,.friend-request-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-glow)}
 .friend-item:last-child,.friend-request-item:last-child{border-bottom:none}
