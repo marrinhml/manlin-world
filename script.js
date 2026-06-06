@@ -113,10 +113,20 @@ async function checkNicknameExists(nickname) {
 }
 
 async function loadIdeas() {
-  const { data: ideasData, error } = await sb
-    .from('ideas')
-    .select('*')
-    .order('created_at', { ascending: false })
+  // 显示加载状态
+  const grid = document.getElementById('cardsGrid')
+  if (grid) {
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⟡</div><p class="empty-text">正在接收星际信号…</p><p class="empty-hint">正在从各星系节点获取最新数据</p></div>`
+  }
+
+  // 第1步：并行获取 ideas 和 comments（无依赖关系）
+  const [ideasResult, commentsResult] = await Promise.all([
+    sb.from('ideas').select('*').order('created_at', { ascending: false }),
+    sb.from('comments').select('*').order('created_at', { ascending: true })
+  ])
+
+  const ideasData = ideasResult.data
+  const error = ideasResult.error
 
   if (error) {
     console.error('loadIdeas error:', error)
@@ -124,52 +134,63 @@ async function loadIdeas() {
     return
   }
 
+  const commentsData = commentsResult.data || []
+  if (commentsResult.error) console.error('loadIdeas comments error:', commentsResult.error)
+
   const ideaIds = ideasData.map(i => i.id)
+  const commentIds = commentsData.map(c => c.id)
 
-  const { data: commentsData, error: commentsError } = await sb
-    .from('comments')
-    .select('*')
-    .in('idea_id', ideaIds)
-    .order('created_at', { ascending: true })
+  // 第2步：并行获取 replies 和 profiles（无依赖关系）
+  const [repliesResult, profilesResult] = await Promise.all([
+    commentIds.length > 0
+      ? sb.from('replies').select('*').in('comment_id', commentIds).order('created_at', { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+    Promise.resolve().then(() => {
+      const userIds = new Set()
+      ideasData.forEach(i => { if (i.author_id) userIds.add(i.author_id) })
+      commentsData.forEach(c => { if (c.author_id) userIds.add(c.author_id) })
+      return userIds
+    }).then(userIds => {
+      if (userIds.size > 0) {
+        return sb.from('profiles').select('*').in('id', Array.from(userIds))
+      }
+      return Promise.resolve({ data: [], error: null })
+    })
+  ])
 
-  if (commentsError) console.error('loadIdeas comments error:', commentsError)
+  const repliesData = repliesResult.data || []
+  if (repliesResult.error) console.error('loadIdeas replies error:', repliesResult.error)
 
-  const commentIds = (commentsData || []).map(c => c.id)
-
-  const { data: repliesData, error: repliesError } = await sb
-    .from('replies')
-    .select('*')
-    .in('comment_id', commentIds)
-    .order('created_at', { ascending: true })
-
-  if (repliesError) console.error('loadIdeas replies error:', repliesError)
+  const profilesData = profilesResult.data || []
+  if (profilesResult.error) console.error('loadIdeas profiles error:', profilesResult.error)
 
   const commentsByIdea = {}
-  ;(commentsData || []).forEach(c => {
+  commentsData.forEach(c => {
     if (!commentsByIdea[c.idea_id]) commentsByIdea[c.idea_id] = []
     commentsByIdea[c.idea_id].push(c)
   })
 
   const repliesByComment = {}
-  ;(repliesData || []).forEach(r => {
+  repliesData.forEach(r => {
     if (!repliesByComment[r.comment_id]) repliesByComment[r.comment_id] = []
     repliesByComment[r.comment_id].push(r)
   })
 
-  const userIds = new Set()
-  ideasData.forEach(i => { if (i.author_id) userIds.add(i.author_id) })
-  commentsData.forEach(c => { if (c.author_id) userIds.add(c.author_id) })
-  repliesData.forEach(r => { if (r.author_id) userIds.add(r.author_id) })
+  const profilesMap = {}
+  profilesData.forEach(p => { profilesMap[p.id] = p })
 
-  let profilesMap = {}
-  if (userIds.size > 0) {
-    const { data: profilesData, error: profilesError } = await sb
+  // 补查回复者的 profile（回复查询与 profile 查询并行，回复者的 ID 未包含在 profiles 中）
+  const missingReplyUserIds = repliesData
+    .map(r => r.author_id)
+    .filter(id => id && !profilesMap[id])
+  if (missingReplyUserIds.length > 0) {
+    const uniqueMissing = [...new Set(missingReplyUserIds)]
+    const { data: extraProfiles } = await sb
       .from('profiles')
       .select('*')
-      .in('id', Array.from(userIds))
-    if (profilesError) console.error('loadIdeas profiles error:', profilesError)
-    if (profilesData) {
-      profilesData.forEach(p => { profilesMap[p.id] = p })
+      .in('id', uniqueMissing)
+    if (extraProfiles) {
+      extraProfiles.forEach(p => { profilesMap[p.id] = p })
     }
   }
 
@@ -2733,52 +2754,43 @@ async function init() {
     })
   })
   if (sb) {
-    try {
-      const { data: { session } } = await sb.auth.getSession()
-      if (session) {
-        currentUser = session.user.id
+    // 并行获取 session 和 ideas（两者无依赖关系）
+    const [sessionResult] = await Promise.all([
+      sb.auth.getSession().catch(e => ({ data: { session: null }, error: e })),
+      loadIdeas().catch(e => { console.error('loadIdeas error (offline mode):', e); ideas = []; isSupabaseOnline = false; updateSupabaseStatus(false) })
+    ])
 
-        let { data: profile, error: profileError } = await sb
-          .from('profiles')
-          .select('*')
-          .eq('id', currentUser)
-          .single()
+    const session = sessionResult?.data?.session
+    if (session) {
+      currentUser = session.user.id
 
-        if (profileError) {
-          console.error('init profile fetch error:', profileError)
-        }
+      let { data: profile, error: profileError } = await sb
+        .from('profiles')
+        .select('*')
+        .eq('id', currentUser)
+        .single()
 
-        if (!profile) {
-          const userEmail = session.user.email || ''
-          const nickname = session.user.user_metadata?.nickname || userEmail.split('@')[0] || '探测员'
-          const { data: newProfile, error: newProfileError } = await sb
-            .from('profiles')
-            .insert({ id: currentUser, nickname, email: userEmail, avatar: '', favorites: [] })
-            .select()
-            .single()
-          if (newProfileError) {
-            console.error('init profile insert error:', newProfileError)
-          }
-          profile = newProfile
-        }
-
-        currentUserProfile = profile
+      if (profileError) {
+        console.error('init profile fetch error:', profileError)
       }
-      updateSupabaseStatus(true)
-    } catch (e) {
-      console.error('Supabase init error (offline mode):', e)
-      isSupabaseOnline = false
-      updateSupabaseStatus(false)
-    }
 
-    try {
-      await loadIdeas()
-    } catch (e) {
-      console.error('loadIdeas error (offline mode):', e)
-      ideas = []
-      isSupabaseOnline = false
-      updateSupabaseStatus(false)
+      if (!profile) {
+        const userEmail = session.user.email || ''
+        const nickname = session.user.user_metadata?.nickname || userEmail.split('@')[0] || '探测员'
+        const { data: newProfile, error: newProfileError } = await sb
+          .from('profiles')
+          .insert({ id: currentUser, nickname, email: userEmail, avatar: '', favorites: [] })
+          .select()
+          .single()
+        if (newProfileError) {
+          console.error('init profile insert error:', newProfileError)
+        }
+        profile = newProfile
+      }
+
+      currentUserProfile = profile
     }
+    updateSupabaseStatus(true)
 
     updateUserUI()
     renderIdeas()
