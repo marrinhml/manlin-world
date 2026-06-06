@@ -2856,7 +2856,7 @@ async function init() {
       spaceAudio._timers = []
 
       const master = ctx.createGain()
-      master.gain.value = 0.55
+      master.gain.value = 0.8
       master.connect(ctx.destination)
 
       // === 太空混响（延迟 + 反馈，营造深邃空间感） ===
