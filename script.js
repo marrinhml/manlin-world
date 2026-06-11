@@ -1421,6 +1421,7 @@ async function handleRegister(e) {
     }
 
     showToast('注册成功', 'success')
+    if (data.user) localStorage.setItem('tutorial_pending_' + data.user.id, '1')
     closeModal('registerModal')
     document.getElementById('registerForm').reset()
   } finally {
@@ -1475,6 +1476,7 @@ async function handleLogin(e) {
 
   currentUserProfile = profile
   updateUserUI()
+  startTutorialIfNeeded()
   await reloadIdeas()
   showToast('登录成功', 'success')
 }
@@ -2616,6 +2618,150 @@ let chatPeerId = null
 let chatMessages = []
 let chatChannel = null
 
+// ===== 新手指导 =====
+let tutorialStep = -1
+let tutorialActive = false
+const TUTORIAL_PREFIX = 'tutorial_pending_'
+
+const tutorialSteps = [
+  { type: 'center', text: '欢迎来到蛮林世界，探测员！', sub: '点击屏幕任意处开始探索指引' },
+  { target: '#btnProfile', text: '查看和编辑个人信息', placement: 'bottom' },
+  { target: '#btnFriends', text: '管理好友关系与聊天', placement: 'bottom' },
+  { target: '#friendList', text: '查看已添加的好友', placement: 'top',
+    onEnter: () => { openFriends(); setTimeout(() => { if (tutorialActive && tutorialStep === 3) renderStep(3) }, 400) } },
+  { target: '#friendSearchInput', text: '搜索添加新朋友', placement: 'bottom' },
+  { target: '.friend-tab[data-tab="requests"]', text: '处理好友申请', placement: 'top',
+    onLeave: () => { closeModal('friendModal'); setTimeout(() => { if (tutorialActive) renderStep(tutorialStep) }, 350) } },
+  { target: '.card-actions', text: '点赞、评论、收藏', placement: 'top',
+    onEnter: () => { const el = document.querySelector('.card-actions'); if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' }) } },
+  { target: '.filter-news-btn', text: '阅览星际资讯动态', placement: 'bottom' },
+  { target: '#btnNewIdea', text: '发布科幻灵感想法', placement: 'bottom' },
+  { target: '#btnAbout', text: '了解本网站的故事', placement: 'bottom' },
+  { target: '#btnLogout', text: '安全退出当前账号', placement: 'bottom' },
+  { type: 'center', text: '教程完成，开始探索吧！', sub: '祝你在蛮林世界旅途愉快' },
+]
+
+function startTutorialIfNeeded() {
+  if (!currentUser) return
+  if (localStorage.getItem(TUTORIAL_PREFIX + currentUser) !== '1') return
+  setTimeout(startTutorial, 600)
+}
+
+function startTutorial() {
+  if (tutorialActive) return
+  tutorialActive = true
+  tutorialStep = 0
+  const overlay = document.getElementById('tutorialOverlay')
+  if (!overlay) return
+  overlay.style.display = ''
+  document.body.style.overflow = 'hidden'
+  renderStep(0)
+  overlay.addEventListener('click', onTutorialClick)
+  window.addEventListener('resize', onTutorialResize)
+}
+
+function onTutorialClick() {
+  if (!tutorialActive) return
+  nextStep()
+}
+
+function onTutorialResize() {
+  if (tutorialActive && tutorialStep >= 0 && tutorialStep < tutorialSteps.length) {
+    renderStep(tutorialStep)
+  }
+}
+
+function nextStep() {
+  if (!tutorialActive) return
+  const step = tutorialSteps[tutorialStep]
+  if (step && step.onLeave) step.onLeave()
+  tutorialStep++
+  if (tutorialStep >= tutorialSteps.length) {
+    endTutorial()
+    return
+  }
+  const next = tutorialSteps[tutorialStep]
+  if (next && next.onEnter) next.onEnter()
+  renderStep(tutorialStep)
+}
+
+function renderStep(index) {
+  const step = tutorialSteps[index]
+  if (!step) return
+  const overlay = document.getElementById('tutorialOverlay')
+  const windowEl = document.getElementById('tutorialWindow')
+  const tooltip = document.getElementById('tutorialTooltip')
+  const text = document.getElementById('tutorialText')
+  const stepEl = document.getElementById('tutorialStep')
+  const arrow = document.getElementById('tutorialArrow')
+  if (!overlay || !windowEl || !tooltip || !text || !stepEl || !arrow) return
+
+  stepEl.textContent = `${index + 1} / ${tutorialSteps.length}`
+
+  if (step.type === 'center') {
+    windowEl.style.display = 'none'
+    tooltip.style.display = 'none'
+    overlay.innerHTML = '<div class="tutorial-center"><span class="tutorial-center-icon">⟡</span><div class="tutorial-center-text">' + step.text + '</div>' + (step.sub ? '<div class="tutorial-center-sub">' + step.sub + '</div>' : '') + '</div>'
+    return
+  }
+
+  overlay.innerHTML = ''
+  overlay.appendChild(windowEl)
+  overlay.appendChild(tooltip)
+
+  text.textContent = step.text
+  windowEl.style.display = ''
+
+  const target = document.querySelector(step.target)
+  if (!target) { windowEl.style.display = 'none'; tooltip.style.display = 'none'; return }
+  tooltip.style.display = ''
+
+  const rect = target.getBoundingClientRect()
+  const pad = 6
+  windowEl.style.left = (rect.left - pad) + 'px'
+  windowEl.style.top = (rect.top - pad) + 'px'
+  windowEl.style.width = (rect.width + pad * 2) + 'px'
+  windowEl.style.height = (rect.height + pad * 2) + 'px'
+
+  const gap = 12
+  const tw = 220
+  let placement = step.placement || 'bottom'
+  let tLeft, tTop
+
+  if (placement === 'bottom') {
+    tLeft = rect.left + rect.width / 2 - tw / 2
+    tTop = rect.bottom + gap
+    arrow.dataset.pos = 'bottom'
+  } else {
+    tLeft = rect.left + rect.width / 2 - tw / 2
+    tTop = rect.top - gap - 80
+    arrow.dataset.pos = 'top'
+  }
+
+  if (tLeft < 8) tLeft = 8
+  if (tLeft + tw > window.innerWidth - 8) tLeft = window.innerWidth - tw - 8
+  tooltip.style.left = tLeft + 'px'
+  tooltip.style.top = tTop + 'px'
+}
+
+function endTutorial() {
+  tutorialActive = false
+  tutorialStep = -1
+  const overlay = document.getElementById('tutorialOverlay')
+  if (overlay) {
+    overlay.style.display = 'none'
+    overlay.innerHTML = ''
+    const windowEl = document.getElementById('tutorialWindow')
+    const tooltip = document.getElementById('tutorialTooltip')
+    if (windowEl) overlay.appendChild(windowEl)
+    if (tooltip) overlay.appendChild(tooltip)
+    overlay.removeEventListener('click', onTutorialClick)
+  }
+  document.body.style.overflow = ''
+  window.removeEventListener('resize', onTutorialResize)
+  if (currentUser) localStorage.setItem(TUTORIAL_PREFIX + currentUser, 'done')
+}
+
 async function init() {
   if (!sb) {
     console.error('Supabase SDK not available, running in offline mode')
@@ -2900,6 +3046,7 @@ async function init() {
 
     updateUserUI()
     renderIdeas()
+    startTutorialIfNeeded()
 
     // 检查未读消息并订阅新消息推送
     if (currentUser) {
