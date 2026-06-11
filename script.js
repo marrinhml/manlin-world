@@ -2642,8 +2642,19 @@ const tutorialSteps = [
 ]
 
 function startTutorialIfNeeded() {
-  if (!currentUser) return
-  if (localStorage.getItem(TUTORIAL_PREFIX + currentUser) !== '1') return
+  if (tutorialActive) return
+  let userId = currentUser
+  if (!userId) {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith(TUTORIAL_PREFIX) && localStorage.getItem(key) === '1') {
+        userId = key.slice(TUTORIAL_PREFIX.length)
+        break
+      }
+    }
+  }
+  if (!userId) return
+  if (localStorage.getItem(TUTORIAL_PREFIX + userId) !== '1') return
   setTimeout(startTutorial, 600)
 }
 
@@ -3046,7 +3057,6 @@ async function init() {
 
     updateUserUI()
     renderIdeas()
-    startTutorialIfNeeded()
 
     // 检查未读消息并订阅新消息推送
     if (currentUser) {
@@ -3086,6 +3096,7 @@ async function init() {
     updateUserUI()
     renderIdeas()
   }
+  startTutorialIfNeeded()
   if (!sb) {
     const checkTimer = setInterval(() => {
       if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
